@@ -3,11 +3,12 @@ package controllers
 import play.api.mvc._
 
 import javax.inject._
-//import scala.concurrent.Future
+import scala.concurrent.Future
 
 @Singleton
 class ApplicationController @Inject()(val controllerComponents: ControllerComponents) extends BaseController {
-  def index() = TODO
+//  def index() = TODO
+  def index() = Action(Ok) // return a 200 OK response to fulfill the test
 
   def create() = TODO
 
