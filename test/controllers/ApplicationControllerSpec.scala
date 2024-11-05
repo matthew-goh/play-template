@@ -9,10 +9,6 @@ import repositories.DataRepository
 import uk.gov.hmrc.mongo.MongoComponent
 
 class ApplicationControllerSpec extends BaseSpecWithApplication {
-  val repository = new DataRepository(new MongoComponent {
-    override def client: MongoClient = MongoClient("mongodb://hostOne:27017")
-    override def database: MongoDatabase = client.getDatabase("mydb")
-  })
   val TestApplicationController = new ApplicationController(
     repository,
     component // comes from BaseSpecWithApplication

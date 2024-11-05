@@ -14,6 +14,7 @@ import play.api.mvc.{AnyContentAsEmpty, MessagesControllerComponents}
 import play.api.test.CSRFTokenHelper.CSRFFRequestHeader
 import play.api.test.FakeRequest
 import play.api.test.Helpers.{GET, POST}
+import repositories.DataRepository
 
 import scala.concurrent.ExecutionContext
 
@@ -24,14 +25,16 @@ trait BaseSpecWithApplication extends BaseSpec with GuiceOneServerPerSuite with 
   implicit val mat: Materializer = app.materializer
   implicit val executionContext: ExecutionContext = app.injector.instanceOf[ExecutionContext]
 
+  // created instances of the controller components and data repository - new instances will be made for each suite run
   lazy val component: MessagesControllerComponents = injector.instanceOf[MessagesControllerComponents]
-  //lazy val repository: DataRepository = injector.instanceOf[DataRepository]
+  lazy val repository: DataRepository = injector.instanceOf[DataRepository]
   //lazy val service: LibraryService = injector.instanceOf[LibraryService]
   //lazy val connector: LibraryConnector = injector.instanceOf[LibraryConnector]
 
   implicit val messagesApi = app.injector.instanceOf[MessagesApi]
   lazy val injector: Injector = app.injector
 
+  // use Guice to help construct an instance of the application being called
   override def fakeApplication(): Application =
     new GuiceApplicationBuilder()
       .configure(Map(
@@ -43,6 +46,7 @@ trait BaseSpecWithApplication extends BaseSpec with GuiceOneServerPerSuite with 
     FakeRequest("", "").withCSRFToken.asInstanceOf[FakeRequest[AnyContentAsEmpty.type]]
   implicit val messages: Messages = messagesApi.preferred(fakeRequest)
 
+  // methods we can use in the tests to pass fake requests to the controller
   def buildPost(url: String): FakeRequest[AnyContentAsEmpty.type] =
     FakeRequest(POST, url).withCSRFToken.asInstanceOf[FakeRequest[AnyContentAsEmpty.type]]
 
