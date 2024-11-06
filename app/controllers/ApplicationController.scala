@@ -4,12 +4,13 @@ import models.DataModel
 import play.api.libs.json._
 import play.api.mvc._
 import repositories.DataRepository
+import services.LibraryService
 
 import javax.inject._
 import scala.concurrent.{ExecutionContext, Future}
 
 @Singleton
-class ApplicationController @Inject()(dataRepository: DataRepository, val controllerComponents: ControllerComponents)
+class ApplicationController @Inject()(dataRepository: DataRepository, service: LibraryService, val controllerComponents: ControllerComponents)
                                      (implicit ec: ExecutionContext) extends BaseController {
 
 //  display a list of all DataModels in the database, selected without parameters
@@ -53,4 +54,20 @@ class ApplicationController @Inject()(dataRepository: DataRepository, val contro
     dataRepository.delete(id).map(_ => Accepted)
     // dataRepository.delete() is a Future[result.DeleteResult]
   }
+
+  def getGoogleBook(search: String, term: String): Action[AnyContent] = Action.async { implicit request =>
+    service.getGoogleBook(search = search, term = term).map {
+      item => Ok {Json.toJson(item)}
+    }
+  }
 }
+
+// googleBooksService.fetchBookData("Scala Programming").map {
+//  case Some(book) =>
+//    // Successfully fetched book data
+//    println(s"Book Title: ${book.volumeInfo.title}")
+//    book.volumeInfo.authors.foreach(authors => println(s"Authors: ${authors.mkString(", ")}"))
+//  case None =>
+//    // Handle error (e.g., book not found)
+//    println("No book found or error occurred.")
+//}

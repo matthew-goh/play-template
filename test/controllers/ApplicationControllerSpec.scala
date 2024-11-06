@@ -16,6 +16,7 @@ import scala.concurrent.Future
 class ApplicationControllerSpec extends BaseSpecWithApplication {
   val TestApplicationController = new ApplicationController(
     repository,
+    service,
     component // comes from BaseSpecWithApplication
   )
 //  val BadTestApplicationController = new ApplicationController(
