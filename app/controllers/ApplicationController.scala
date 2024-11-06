@@ -18,7 +18,7 @@ class ApplicationController @Inject()(dataRepository: DataRepository, service: L
   def index(): Action[AnyContent] = Action.async { implicit request =>
     dataRepository.index().map{ // dataRepository.index() is a Future[Either[Int, Seq[DataModel]]]
       case Right(item: Seq[DataModel]) => Ok {Json.toJson(item)}
-      case Left(error) => Status(error)(Json.toJson("Unable to find any books"))
+      case Left(error) => Status(error.httpResponseStatus)("Unable to find the database")
     }
   }
 
@@ -56,18 +56,9 @@ class ApplicationController @Inject()(dataRepository: DataRepository, service: L
   }
 
   def getGoogleBook(search: String, term: String): Action[AnyContent] = Action.async { implicit request =>
-    service.getGoogleBook(search = search, term = term).map {
-      item => Ok {Json.toJson(item)}
+    service.getGoogleBook(search = search, term = term).value.map {
+      case Right(book) => Ok {Json.toJson(book)}
+      case Left(error) => Status(error.httpResponseStatus)(error.reason)
     }
   }
 }
-
-// googleBooksService.fetchBookData("Scala Programming").map {
-//  case Some(book) =>
-//    // Successfully fetched book data
-//    println(s"Book Title: ${book.volumeInfo.title}")
-//    book.volumeInfo.authors.foreach(authors => println(s"Authors: ${authors.mkString(", ")}"))
-//  case None =>
-//    // Handle error (e.g., book not found)
-//    println("No book found or error occurred.")
-//}
