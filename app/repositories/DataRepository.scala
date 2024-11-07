@@ -62,6 +62,10 @@ class DataRepository @Inject()(mongoComponent: MongoComponent)
     }
   // retrieve a list DataModel objects for which a specified field equals a specified value
   def readBySpecifiedField(field: String, value: String): Future[Seq[DataModel]] = {
+    field match {
+      case "_id" | "name" | "description" => // ok
+      case _ => throw new Exception("Invalid field to search")
+    }
     collection.find(bySpecifiedField(field, value)).toFuture()
   }
 

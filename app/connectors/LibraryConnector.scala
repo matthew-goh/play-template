@@ -19,7 +19,6 @@ class LibraryConnector @Inject()(ws: WSClient) {
     EitherT {
       response
         .map {
-          // HOW DO I KNOW IF THE EXTRACTED JSON CAN BE CONVERTED TO A BOOK OBJECT?
           result => Right(result.json.as[Response])
         }
         .recover { case _: WSResponse =>

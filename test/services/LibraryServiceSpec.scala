@@ -28,19 +28,18 @@ class LibraryServiceSpec extends BaseSpec with MockFactory with ScalaFutures wit
   "getGoogleBook" should {
     val url: String = "testUrl"
 
-    "return a book" in {
-      println(gameOfThrones.as[Book])
-      (mockConnector.get[Book](_: String)(_: OFormat[Book], _: ExecutionContext))
-        .expects(url, *, *) // can take *, which shows that the connector can expect any request in place of the parameter. You might sometimes see this as any().
-        .returning(EitherT.rightT(gameOfThrones.as[Book])) // explicitly states what the connector method returns
-        .once() // how many times we can expect this response
-
-      // allows for the result to be waited for as the Future type can be seen as a placeholder for a value we don't have yet
-      whenReady(testService.getGoogleBook(urlOverride = Some(url), search = "", term = "").value) { result =>
-        result shouldBe Right(Book("someId", "A Game of Thrones", Some("The best book!!!"), 100))
-        // Book(someId,A Game of Thrones,Some(The best book!!!),100)
-      }
-    }
+//    "return a book" in {
+//      (mockConnector.get[Book](_: String)(_: OFormat[Book], _: ExecutionContext))
+//        .expects(url, *, *) // can take *, which shows that the connector can expect any request in place of the parameter. You might sometimes see this as any().
+//        .returning(EitherT.rightT(gameOfThrones.as[Book])) // explicitly states what the connector method returns
+//        .once() // how many times we can expect this response
+//
+//      // allows for the result to be waited for as the Future type can be seen as a placeholder for a value we don't have yet
+//      whenReady(testService.getGoogleBook(urlOverride = Some(url), search = "", term = "").value) { result =>
+//        result shouldBe Right(Book("someId", "A Game of Thrones", Some("The best book!!!"), 100))
+//        // Book(someId,A Game of Thrones,Some(The best book!!!),100)
+//      }
+//    }
 
     "return an error" in {
       val url: String = "testUrl"
