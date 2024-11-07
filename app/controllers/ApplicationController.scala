@@ -39,6 +39,14 @@ class ApplicationController @Inject()(dataRepository: DataRepository, service: L
       item => Ok {Json.toJson(item)}
     }
   }
+  def readBySpecifiedField(field: String, name: String): Action[AnyContent] = Action.async { implicit request =>
+    dataRepository.readBySpecifiedField(field, name).map{ // dataRepository.index() is a Future[DataModel]
+      item => Ok {Json.toJson(item)}
+    }
+//      .recover {
+//      case _: Future(BadRequest)
+//    }
+  }
 
   def update(id: String): Action[JsValue] = Action.async(parse.json) { implicit request =>
     request.body.validate[DataModel] match {
@@ -58,6 +66,23 @@ class ApplicationController @Inject()(dataRepository: DataRepository, service: L
   def getGoogleBook(search: String, term: String): Action[AnyContent] = Action.async { implicit request =>
     service.getGoogleBook(search = search, term = term).value.map {
       case Right(book) => Ok {Json.toJson(book)}
+      case Left(error) => Status(error.httpResponseStatus)(error.reason)
+    }
+  }
+  def getGoogleCollection(search: String, term: String): Action[AnyContent] = Action.async { implicit request =>
+    service.getGoogleCollection(search = search, term = term).value.map {
+      case Right(collection) => {
+        Ok {Json.toJson(collection)}
+//        Ok {Json.toJson(service.extractBooksFromCollection(collection))}
+      }
+      case Left(error) => Status(error.httpResponseStatus)(error.reason)
+    }
+  }
+  def getGoogleBookList(search: String, term: String): Action[AnyContent] = Action.async { implicit request =>
+    service.getGoogleCollection(search = search, term = term).value.map {
+      case Right(collection) => {
+        Ok {Json.toJson(service.extractBooksFromCollection(collection))}
+      }
       case Left(error) => Status(error.httpResponseStatus)(error.reason)
     }
   }

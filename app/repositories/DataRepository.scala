@@ -45,6 +45,14 @@ class DataRepository @Inject()(mongoComponent: MongoComponent)
     Filters.and(
       Filters.equal("_id", id)
     )
+//  private def hasField(field: String): Bson =
+//    Filters.and(
+//      Filters.exists(field)
+//    )
+  private def bySpecifiedField(field: String, value: String): Bson =
+    Filters.and(
+      Filters.equal(field, value)
+    )
 
   // retrieve a DataModel object from database - uses an id parameter
   def read(id: String): Future[DataModel] =
@@ -52,6 +60,10 @@ class DataRepository @Inject()(mongoComponent: MongoComponent)
       case Some(data) =>
         Future(data)
     }
+  // retrieve a list DataModel objects for which a specified field equals a specified value
+  def readBySpecifiedField(field: String, value: String): Future[Seq[DataModel]] = {
+    collection.find(bySpecifiedField(field, value)).toFuture()
+  }
 
   // takes in a DataModel, finds a matching document with the same id and updates the document, then returns the updated DataModel
   def update(id: String, book: DataModel): Future[result.UpdateResult] =
@@ -60,6 +72,22 @@ class DataRepository @Inject()(mongoComponent: MongoComponent)
       replacement = book,
       options = new ReplaceOptions().upsert(true) //What happens when we set this to false?
     ).toFuture()
+
+//  def updateWithValue(id: String, field: String, newValue: Any): Future[result.UpdateResult] = {
+//    field match {
+//      case "name" | "description" =>
+//        if(!newValue.isInstanceOf[String]) throw new Exception("Field value must be a string")
+//      case "pageCount" =>
+//        if(!newValue.isInstanceOf[Int]) throw new Exception("Page count must be an integer")
+//      case _ => throw new Exception("Invalid field to update")
+//    }
+//
+//    collection.replaceOne(
+//      filter = byID(id),
+//      replacement = book,
+//      options = new ReplaceOptions().upsert(true) //What happens when we set this to false?
+//    ).toFuture()
+//  }
 
   // delete a document
   def delete(id: String): Future[result.DeleteResult] =
