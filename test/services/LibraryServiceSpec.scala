@@ -3,7 +3,7 @@ package services
 import baseSpec.BaseSpec
 import cats.data.EitherT
 import connectors.LibraryConnector
-import models.{APIError, Book}
+import models.{APIError, Book, Collection, DataModel}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatestplus.play.guice.GuiceOneAppPerSuite
@@ -17,29 +17,28 @@ class LibraryServiceSpec extends BaseSpec with MockFactory with ScalaFutures wit
   implicit val executionContext: ExecutionContext = app.injector.instanceOf[ExecutionContext]
   val testService = new LibraryService(mockConnector)
 
-  val gameOfThrones: JsValue = Json.obj(
-    "_id" -> "someId",
-    "name" -> "A Game of Thrones",
-    "description" -> "The best book!!!",
-    "pageCount" -> 100
-  )
+//  val gameOfThrones: JsValue = Json.obj(
+//    "_id" -> "someId",
+//    "name" -> "A Game of Thrones",
+//    "description" -> "The best book!!!",
+//    "pageCount" -> 100
+//  )
   // {"_id":"someId","name":"A Game of Thrones","description":"The best book!!!","pageCount":100}
 
-  "getGoogleBook" should {
+  "getGoogleCollection" should {
     val url: String = "testUrl"
 
-//    "return a book" in {
-//      (mockConnector.get[Book](_: String)(_: OFormat[Book], _: ExecutionContext))
-//        .expects(url, *, *) // can take *, which shows that the connector can expect any request in place of the parameter. You might sometimes see this as any().
-//        .returning(EitherT.rightT(gameOfThrones.as[Book])) // explicitly states what the connector method returns
-//        .once() // how many times we can expect this response
-//
-//      // allows for the result to be waited for as the Future type can be seen as a placeholder for a value we don't have yet
-//      whenReady(testService.getGoogleBook(urlOverride = Some(url), search = "", term = "").value) { result =>
-//        result shouldBe Right(Book("someId", "A Game of Thrones", Some("The best book!!!"), 100))
-//        // Book(someId,A Game of Thrones,Some(The best book!!!),100)
-//      }
-//    }
+    "return a Collection" in {
+      (mockConnector.get[Collection](_: String)(_: OFormat[Collection], _: ExecutionContext))
+        .expects(url, *, *) // can take *, which shows that the connector can expect any request in place of the parameter. You might sometimes see this as any().
+        .returning(EitherT.rightT(testAPIResult.as[Collection])) // explicitly states what the connector method returns
+        .once() // how many times we can expect this response
+
+      // allows for the result to be waited for as the Future type can be seen as a placeholder for a value we don't have yet
+      whenReady(testService.getGoogleCollection(urlOverride = Some(url), search = "", term = "").value) { result =>
+        result shouldBe Right(Collection("books#volumes", 1, testAPIItems))
+      }
+    }
 
     "return an error" in {
       val url: String = "testUrl"
@@ -54,4 +53,111 @@ class LibraryServiceSpec extends BaseSpec with MockFactory with ScalaFutures wit
       }
     }
   }
+
+  "convertBookToDataModel" should {
+    "return a DataModel with the correct field values" in {
+      testService.convertBookToDataModel(testAPIbook) shouldBe testAPIDataModel
+    }
+    "return a DataModel with empty description if description is missing from VolumeInfo" in {
+      testService.convertBookToDataModel(testAPIbookNoDesc) shouldBe testAPIDataModelNoDesc
+    }
+  }
+
+  "extractBooksFromCollection" should {
+    "convert a Collection into a list of DataModel objects" in {
+      testService.extractBooksFromCollection(testAPICollection) shouldBe(Seq(testAPIDataModel))
+    }
+  }
+
+  val testAPIResult: JsValue = Json.parse("""{
+    "kind": "books#volumes",
+    "totalItems": 1,
+    "items": [
+      {
+        "kind": "books#volume",
+        "id": "1GIrEAAAQBAJ",
+        "etag": "YRo3QBZZBzI",
+        "selfLink": "https://www.googleapis.com/books/v1/volumes/1GIrEAAAQBAJ",
+        "volumeInfo": {
+          "title": "The Decagon House Murders",
+          "authors": [
+            "Yukito Ayatsuji"
+          ],
+          "publisher": "Pushkin Vertigo",
+          "publishedDate": "2021-05-25",
+          "description": "\"Ayatsuji's brilliant and richly atmospheric puzzle will appeal to fans of golden age whodunits...\"",
+          "industryIdentifiers": [
+            {
+              "type": "ISBN_13",
+              "identifier": "9781782276340"
+            },
+            {
+              "type": "ISBN_10",
+              "identifier": "1782276343"
+            }
+          ],
+          "readingModes": {
+            "text": false,
+            "image": false
+          },
+          "pageCount": 289,
+          "printType": "BOOK",
+          "categories": [
+            "Fiction"
+          ],
+          "maturityRating": "NOT_MATURE",
+          "allowAnonLogging": false,
+          "contentVersion": "0.3.0.0.preview.0",
+          "panelizationSummary": {
+            "containsEpubBubbles": false,
+            "containsImageBubbles": false
+          },
+          "imageLinks": {
+            "smallThumbnail": "http://books.google.com/books/content?id=1GIrEAAAQBAJ&printsec=frontcover&img=1&zoom=5&source=gbs_api",
+            "thumbnail": "http://books.google.com/books/content?id=1GIrEAAAQBAJ&printsec=frontcover&img=1&zoom=1&source=gbs_api"
+          },
+          "language": "en",
+          "previewLink": "http://books.google.co.uk/books?id=1GIrEAAAQBAJ&dq=isbn:9781782276340&hl=&cd=1&source=gbs_api",
+          "infoLink": "http://books.google.co.uk/books?id=1GIrEAAAQBAJ&dq=isbn:9781782276340&hl=&source=gbs_api",
+          "canonicalVolumeLink": "https://books.google.com/books/about/The_Decagon_House_Murders.html?hl=&id=1GIrEAAAQBAJ"
+        },
+        "saleInfo": {
+          "country": "GB",
+          "saleability": "NOT_FOR_SALE",
+          "isEbook": false
+        },
+        "accessInfo": {
+          "country": "GB",
+          "viewability": "NO_PAGES",
+          "embeddable": false,
+          "publicDomain": false,
+          "textToSpeechPermission": "ALLOWED",
+          "epub": {
+            "isAvailable": false
+          },
+          "pdf": {
+            "isAvailable": true
+          },
+          "webReaderLink": "http://play.google.com/books/reader?id=1GIrEAAAQBAJ&hl=&source=gbs_api",
+          "accessViewStatus": "NONE",
+          "quoteSharingAllowed": false
+        },
+        "searchInfo": {
+          "textSnippet": "As the students are picked off one by one, he weaves in the story of the mainland investigation of the earlier murders. This is a homage to Golden Age detective fiction, but it’s also unabashed entertainment.&quot;"
+        }
+      }
+    ]
+  }""")
+
+  val testAPIItems: JsValue = (testAPIResult \ "items").get
+  val testAPIVolumeInfo: JsValue = (testAPIItems(0) \ "volumeInfo").get
+  val testAPIVolumeInfoNoDesc = Json.parse(
+    """{"title": "The Decagon House Murders", "authors": ["Yukito Ayatsuji"], "publisher": "Pushkin Vertigo", "publishedDate": "2021-05-25", "pageCount": 289}""".stripMargin)
+
+  val testAPICollection = Collection("books#volumes", 1, testAPIItems)
+  val testAPIbook = Book("1GIrEAAAQBAJ", testAPIVolumeInfo)
+  val testAPIbookNoDesc = Book("1GIrEAAAQBAJ", testAPIVolumeInfoNoDesc)
+  val testAPIDataModel = DataModel("1GIrEAAAQBAJ", "The Decagon House Murders",
+    "\"Ayatsuji's brilliant and richly atmospheric puzzle will appeal to fans of golden age whodunits...\"", 289)
+  val testAPIDataModelNoDesc = DataModel("1GIrEAAAQBAJ", "The Decagon House Murders", "", 289)
 }
