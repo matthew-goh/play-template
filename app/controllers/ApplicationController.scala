@@ -35,7 +35,7 @@ class ApplicationController @Inject()(dataRepository: DataRepository, service: L
   //Think about what is returned from .create() and how you can match on this similar to validating the request body
 
   def read(id: String): Action[AnyContent] = Action.async { implicit request =>
-    dataRepository.read(id).map{ // dataRepository.index() is a Future[DataModel]
+    dataRepository.read(id).map{ // dataRepository.read() is a Future[DataModel]
       item => Ok {Json.toJson(item)}
     }
   }
@@ -56,6 +56,11 @@ class ApplicationController @Inject()(dataRepository: DataRepository, service: L
       // dataRepository.update() is a Future[result.UpdateResult]
       case JsError(_) => Future(BadRequest)
     }
+  }
+  def updateWithValue(id: String, field: String, newValue: String): Action[AnyContent] = Action.async { implicit request =>
+    dataRepository.updateWithValue(id, field, newValue)
+    Thread.sleep(200)
+    dataRepository.read(id).map(item => Accepted {Json.toJson(item)})
   }
 
   def delete(id: String): Action[AnyContent] = Action.async { implicit request =>

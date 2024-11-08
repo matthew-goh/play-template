@@ -77,21 +77,21 @@ class DataRepository @Inject()(mongoComponent: MongoComponent)
       options = new ReplaceOptions().upsert(true) //What happens when we set this to false?
     ).toFuture()
 
-//  def updateWithValue(id: String, field: String, newValue: Any): Future[result.UpdateResult] = {
-//    field match {
-//      case "name" | "description" =>
-//        if(!newValue.isInstanceOf[String]) throw new Exception("Field value must be a string")
-//      case "pageCount" =>
-//        if(!newValue.isInstanceOf[Int]) throw new Exception("Page count must be an integer")
-//      case _ => throw new Exception("Invalid field to update")
-//    }
-//
+  def updateWithValue(id: String, field: String, newValue: String): Future[result.UpdateResult] = {
+    field match {
+      case "name" | "description" =>
+        collection.updateOne(Filters.equal("_id", id), Updates.set(field, newValue)).toFuture()
+      case "pageCount" =>
+        if(!newValue.forall(Character.isDigit)) throw new Exception("Page count must be an integer")
+        collection.updateOne(Filters.equal("_id", id), Updates.set(field, newValue.toInt)).toFuture()
+      case _ => throw new Exception("Invalid field to update")
+    }
 //    collection.replaceOne(
 //      filter = byID(id),
 //      replacement = book,
 //      options = new ReplaceOptions().upsert(true) //What happens when we set this to false?
 //    ).toFuture()
-//  }
+  }
 
   // delete a document
   def delete(id: String): Future[result.DeleteResult] =

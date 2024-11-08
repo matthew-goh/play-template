@@ -56,10 +56,10 @@ class LibraryServiceSpec extends BaseSpec with MockFactory with ScalaFutures wit
 
   "convertBookToDataModel" should {
     "return a DataModel with the correct field values" in {
-      testService.convertBookToDataModel(testAPIbook) shouldBe testAPIDataModel
+      testService.convertBookToDataModel(testAPIBook) shouldBe testAPIDataModel
     }
     "return a DataModel with empty description if description is missing from VolumeInfo" in {
-      testService.convertBookToDataModel(testAPIbookNoDesc) shouldBe testAPIDataModelNoDesc
+      testService.convertBookToDataModel(testAPIBookNoDesc) shouldBe testAPIDataModelNoDesc
     }
   }
 
@@ -151,13 +151,13 @@ class LibraryServiceSpec extends BaseSpec with MockFactory with ScalaFutures wit
 
   val testAPIItems: JsValue = (testAPIResult \ "items").get
   val testAPIVolumeInfo: JsValue = (testAPIItems(0) \ "volumeInfo").get
-  val testAPIVolumeInfoNoDesc = Json.parse(
+  val testAPIVolumeInfoNoDesc: JsValue = Json.parse(
     """{"title": "The Decagon House Murders", "authors": ["Yukito Ayatsuji"], "publisher": "Pushkin Vertigo", "publishedDate": "2021-05-25", "pageCount": 289}""".stripMargin)
 
-  val testAPICollection = Collection("books#volumes", 1, testAPIItems)
-  val testAPIbook = Book("1GIrEAAAQBAJ", testAPIVolumeInfo)
-  val testAPIbookNoDesc = Book("1GIrEAAAQBAJ", testAPIVolumeInfoNoDesc)
-  val testAPIDataModel = DataModel("1GIrEAAAQBAJ", "The Decagon House Murders",
+  val testAPICollection: Collection = Collection("books#volumes", 1, testAPIItems)
+  val testAPIBook: Book = Book("1GIrEAAAQBAJ", testAPIVolumeInfo)
+  val testAPIBookNoDesc: Book = Book("1GIrEAAAQBAJ", testAPIVolumeInfoNoDesc)
+  val testAPIDataModel: DataModel = DataModel("1GIrEAAAQBAJ", "The Decagon House Murders",
     "\"Ayatsuji's brilliant and richly atmospheric puzzle will appeal to fans of golden age whodunits...\"", 289)
-  val testAPIDataModelNoDesc = DataModel("1GIrEAAAQBAJ", "The Decagon House Murders", "", 289)
+  val testAPIDataModelNoDesc: DataModel = DataModel("1GIrEAAAQBAJ", "The Decagon House Murders", "", 289)
 }
