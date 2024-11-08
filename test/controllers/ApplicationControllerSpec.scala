@@ -1,28 +1,32 @@
 package controllers
 
 import baseSpec.BaseSpecWithApplication
-import models.DataModel
+import cats.data.EitherT
+import models.{APIError, Collection, DataModel}
 import org.mongodb.scala.{MongoClient, MongoDatabase}
+import org.scalamock.scalatest.MockFactory
+import org.scalatestplus.play.guice.GuiceOneAppPerSuite
+import services.LibraryServiceSpec
+import org.scalatest.concurrent.ScalaFutures
 import play.api.test.FakeRequest
 import play.api.http.Status
 import play.api.libs.json._
 import play.api.mvc.{AnyContent, Result}
 import play.api.test.Helpers._
 import repositories.DataRepository
+import services.LibraryService
 import uk.gov.hmrc.mongo.MongoComponent
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 
-class ApplicationControllerSpec extends BaseSpecWithApplication {
+class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory {
+  val mockLibraryService: LibraryService = mock[LibraryService]
+
   val TestApplicationController = new ApplicationController(
     repository,
-    service,
+    mockLibraryService,
     component // comes from BaseSpecWithApplication
   )
-//  val BadTestApplicationController = new ApplicationController(
-//    dataRepository = new DataRepository(MongoComponent(MongoDatabase = "??")),
-//    component // comes from BaseSpecWithApplication
-//  )
 
   private val dataModel: DataModel = DataModel(
     "abcd",
@@ -70,10 +74,11 @@ class ApplicationControllerSpec extends BaseSpecWithApplication {
 
       val createdResult: Future[Result] = TestApplicationController.create()(request)
       status(createdResult) shouldBe Status.CREATED
+      contentAsJson(createdResult).as[DataModel] shouldBe dataModel
       afterEach()
     }
 
-    "return a BadRequest if the book could not be created" in {
+    "return a BadRequest if the request body could not be parsed into a DataModel" in {
       beforeEach()
       val request: FakeRequest[JsValue] = buildPost("/api").withBody[JsValue](Json.toJson("abcd"))
       val createdResult: Future[Result] = TestApplicationController.create()(request)
@@ -88,7 +93,6 @@ class ApplicationControllerSpec extends BaseSpecWithApplication {
       // need to use .create before we can find something in our repository
       val request: FakeRequest[JsValue] = buildGet("/api/${dataModel._id}").withBody[JsValue](Json.toJson(dataModel))
       val createdResult: Future[Result] = TestApplicationController.create()(request)
-      //Hint: You could use status(createdResult) shouldBe Status.CREATED to check this has worked again
 
       val readResult: Future[Result] = TestApplicationController.read("abcd")(FakeRequest())
       status(readResult) shouldBe Status.OK
@@ -97,12 +101,12 @@ class ApplicationControllerSpec extends BaseSpecWithApplication {
       afterEach()
     }
 
-    "return a failed Future if the book could not be found" in {
+    "return a BadRequest if the book could not be found" in {
       beforeEach()
       val readResult: Future[Result] = TestApplicationController.read("aaaa")(FakeRequest())
-//      println(readResult)
-//      println(readResult.failed.futureValue)
-      readResult.failed.futureValue shouldBe a[scala.MatchError]
+      Thread.sleep(200)
+      status(readResult) shouldBe NOT_FOUND
+      contentAsString(readResult) shouldBe "Bad response from upstream; got status: 404, and got reason: Book not found"
       afterEach()
     }
   }
@@ -140,6 +144,14 @@ class ApplicationControllerSpec extends BaseSpecWithApplication {
       contentAsJson(readResult).as[Seq[DataModel]] shouldBe Seq(dataModel)
       afterEach()
     }
+
+    "return a BadRequest if an invalid field is specified" in {
+      beforeEach()
+      val readResult: Future[Result] = TestApplicationController.readBySpecifiedField("bad", "qqq")(FakeRequest())
+      status(readResult) shouldBe Status.BAD_REQUEST
+      contentAsString(readResult) shouldBe "Bad response from upstream; got status: 500, and got reason: Invalid field to search"
+      afterEach()
+    }
   }
 
   "ApplicationController .update()" should {
@@ -156,7 +168,7 @@ class ApplicationControllerSpec extends BaseSpecWithApplication {
       afterEach()
     }
 
-    "return a BadRequest if the book could not be updated" in {
+    "return a BadRequest if the if the request body could not be parsed into a DataModel" in {
       beforeEach()
       val request: FakeRequest[JsValue] = buildGet("/api/${dataModel._id}").withBody[JsValue](Json.toJson(dataModel))
       val createdResult: Future[Result] = TestApplicationController.create()(request)
@@ -185,7 +197,7 @@ class ApplicationControllerSpec extends BaseSpecWithApplication {
 
       val updateResult = TestApplicationController.updateWithValue("abcd", "name", "New Name")(FakeRequest())
       status(updateResult) shouldBe Status.ACCEPTED
-      contentAsJson(updateResult).as[DataModel] shouldBe DataModel("abcd", "New Name", "test description", 100)
+      contentAsString(updateResult) shouldBe "name of book abcd has been updated to: New Name"
       afterEach()
     }
 
@@ -196,29 +208,42 @@ class ApplicationControllerSpec extends BaseSpecWithApplication {
 
       val updateResult = TestApplicationController.updateWithValue("abcd", "pageCount", "200")(FakeRequest())
       status(updateResult) shouldBe Status.ACCEPTED
-      contentAsJson(updateResult).as[DataModel] shouldBe DataModel("abcd", "test name", "test description", 200)
+      contentAsString(updateResult) shouldBe "pageCount of book abcd has been updated to: 200"
       afterEach()
     }
 
-//    "return a BadRequest if the book could not be updated" in {
-//      beforeEach()
-//      val request: FakeRequest[JsValue] = buildGet("/api/${dataModel._id}").withBody[JsValue](Json.toJson(dataModel))
-//      val createdResult: Future[Result] = TestApplicationController.create()(request)
-//
-//      val badUpdateRequest: FakeRequest[JsValue] = buildPost("/api/${dataModel._id}").withBody[JsValue](Json.toJson("abcd"))
-//      val badUpdateResult = TestApplicationController.update("abcd")(badUpdateRequest)
-//      status(badUpdateResult) shouldBe Status.BAD_REQUEST
-//      afterEach()
-//    }
-//
-//    "creates the book in the database if it could not be found" in { // upsert(true)
-//      beforeEach()
-//      val updateRequest: FakeRequest[JsValue] = buildPost("/api/${dataModel._id}").withBody[JsValue](Json.toJson(newDataModel))
-//      val updateResult = TestApplicationController.update("abcd")(updateRequest) // Future(<not completed>)
-//      status(updateResult) shouldBe Status.ACCEPTED
-//      contentAsJson(updateResult).as[DataModel] shouldBe newDataModel
-//      afterEach()
-//    }
+    "return a BadRequest if an invalid field is specified" in {
+      beforeEach()
+      val request: FakeRequest[JsValue] = buildGet("/api/${dataModel._id}").withBody[JsValue](Json.toJson(dataModel))
+      val createdResult: Future[Result] = TestApplicationController.create()(request)
+
+      val readResult: Future[Result] = TestApplicationController.updateWithValue("abcd", "bad", "qqq")(FakeRequest())
+      status(readResult) shouldBe Status.BAD_REQUEST
+      contentAsString(readResult) shouldBe "Bad response from upstream; got status: 500, and got reason: Invalid field to update"
+      afterEach()
+    }
+
+    "return a BadRequest if page count is updated with a non-integer value" in {
+      beforeEach()
+      val request: FakeRequest[JsValue] = buildGet("/api/${dataModel._id}").withBody[JsValue](Json.toJson(dataModel))
+      val createdResult: Future[Result] = TestApplicationController.create()(request)
+
+      val readResult: Future[Result] = TestApplicationController.updateWithValue("abcd", "pageCount", "1xx")(FakeRequest())
+      status(readResult) shouldBe Status.BAD_REQUEST
+      contentAsString(readResult) shouldBe "Bad response from upstream; got status: 500, and got reason: Page count must be an integer"
+      afterEach()
+    }
+
+    "return a BadRequest if the book does not exist in the database" in {
+      beforeEach()
+      val request: FakeRequest[JsValue] = buildGet("/api/${dataModel._id}").withBody[JsValue](Json.toJson(dataModel))
+      val createdResult: Future[Result] = TestApplicationController.create()(request)
+
+      val readResult: Future[Result] = TestApplicationController.updateWithValue("aaaa", "pageCount", "100")(FakeRequest())
+      status(readResult) shouldBe Status.BAD_REQUEST
+      contentAsString(readResult) shouldBe "Bad response from upstream; got status: 404, and got reason: Book not found"
+      afterEach()
+    }
   }
 
   "ApplicationController .delete()" should {
@@ -250,6 +275,49 @@ class ApplicationControllerSpec extends BaseSpecWithApplication {
       status(indexResult) shouldBe Status.OK
       contentAsJson(indexResult).as[Seq[DataModel]] shouldBe Seq(dataModel)
       afterEach()
+    }
+  }
+
+  "ApplicationController .getGoogleCollection()" should {
+    "return a Collection" in {
+      (mockLibraryService.getGoogleCollection(_: Option[String], _: String, _: String)(_: ExecutionContext))
+        .expects(None, *, *, *)
+        .returning(EitherT.rightT(LibraryServiceSpec.testAPIResult.as[Collection]))
+        .once()
+
+      val collectionResult: Future[Result] = TestApplicationController.getGoogleCollection(search = "", term = "")(FakeRequest())
+      println(collectionResult)
+      status(collectionResult) shouldBe OK
+      contentAsJson(collectionResult) shouldBe LibraryServiceSpec.testAPIResult
+    }
+  }
+
+  "ApplicationController .getGoogleBookList()" should {
+    "return a list of DataModels" in {
+      (mockLibraryService.getGoogleCollection(_: Option[String], _: String, _: String)(_: ExecutionContext))
+        .expects(None, *, *, *)
+        .returning(EitherT.rightT(LibraryServiceSpec.testAPIResult.as[Collection]))
+        .once()
+
+      (mockLibraryService.extractBooksFromCollection(_: Collection))
+        .expects(*)
+        .returning(Seq(LibraryServiceSpec.testAPIDataModel))
+        .once()
+
+      val extractionResult: Future[Result] = TestApplicationController.getGoogleBookList(search = "", term = "")(FakeRequest())
+      status(extractionResult) shouldBe OK
+      contentAsJson(extractionResult).as[Seq[DataModel]] shouldBe Seq(LibraryServiceSpec.testAPIDataModel)
+    }
+
+    "return an error" in {
+      (mockLibraryService.getGoogleCollection(_: Option[String], _: String, _: String)(_: ExecutionContext))
+        .expects(None, *, *, *)
+        .returning(EitherT.leftT(APIError.BadAPIResponse(500, "Could not connect")))
+        .once()
+
+      val extractionResult: Future[Result] = TestApplicationController.getGoogleBookList(search = "", term = "")(FakeRequest())
+      status(extractionResult) shouldBe BAD_REQUEST
+      contentAsString(extractionResult) shouldBe "Bad response from upstream; got status: 500, and got reason: Could not connect"
     }
   }
 

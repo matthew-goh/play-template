@@ -31,12 +31,12 @@ class LibraryServiceSpec extends BaseSpec with MockFactory with ScalaFutures wit
     "return a Collection" in {
       (mockConnector.get[Collection](_: String)(_: OFormat[Collection], _: ExecutionContext))
         .expects(url, *, *) // can take *, which shows that the connector can expect any request in place of the parameter. You might sometimes see this as any().
-        .returning(EitherT.rightT(testAPIResult.as[Collection])) // explicitly states what the connector method returns
+        .returning(EitherT.rightT(LibraryServiceSpec.testAPIResult.as[Collection])) // explicitly states what the connector method returns
         .once() // how many times we can expect this response
 
       // allows for the result to be waited for as the Future type can be seen as a placeholder for a value we don't have yet
       whenReady(testService.getGoogleCollection(urlOverride = Some(url), search = "", term = "").value) { result =>
-        result shouldBe Right(Collection("books#volumes", 1, testAPIItems))
+        result shouldBe Right(Collection("books#volumes", 1, LibraryServiceSpec.testAPIItems))
       }
     }
 
@@ -48,7 +48,7 @@ class LibraryServiceSpec extends BaseSpec with MockFactory with ScalaFutures wit
         .returning(EitherT.leftT(APIError.BadAPIResponse(500, "Could not connect")))// How do we return an error?
         .once()
 
-      whenReady(testService.getGoogleBook(urlOverride = Some(url), search = "", term = "").value) { result =>
+      whenReady(testService.getGoogleCollection(urlOverride = Some(url), search = "", term = "").value) { result =>
         result shouldBe Left(APIError.BadAPIResponse(500, "Could not connect"))
       }
     }
@@ -56,19 +56,21 @@ class LibraryServiceSpec extends BaseSpec with MockFactory with ScalaFutures wit
 
   "convertBookToDataModel" should {
     "return a DataModel with the correct field values" in {
-      testService.convertBookToDataModel(testAPIBook) shouldBe testAPIDataModel
+      testService.convertBookToDataModel(LibraryServiceSpec.testAPIBook) shouldBe LibraryServiceSpec.testAPIDataModel
     }
     "return a DataModel with empty description if description is missing from VolumeInfo" in {
-      testService.convertBookToDataModel(testAPIBookNoDesc) shouldBe testAPIDataModelNoDesc
+      testService.convertBookToDataModel(LibraryServiceSpec.testAPIBookNoDesc) shouldBe LibraryServiceSpec.testAPIDataModelNoDesc
     }
   }
 
   "extractBooksFromCollection" should {
     "convert a Collection into a list of DataModel objects" in {
-      testService.extractBooksFromCollection(testAPICollection) shouldBe(Seq(testAPIDataModel))
+      testService.extractBooksFromCollection(LibraryServiceSpec.testAPICollection) shouldBe(Seq(LibraryServiceSpec.testAPIDataModel))
     }
   }
+}
 
+object LibraryServiceSpec {
   val testAPIResult: JsValue = Json.parse("""{
     "kind": "books#volumes",
     "totalItems": 1,

@@ -11,11 +11,11 @@ import scala.concurrent.{ExecutionContext, Future}
 @Singleton
 class LibraryService @Inject()(connector: LibraryConnector) {
   // call the connector via this service
-  def getGoogleBook(urlOverride: Option[String] = None, search: String, term: String)(implicit ec: ExecutionContext): EitherT[Future, APIError, Book] = {
-    connector.get[Book](urlOverride.getOrElse(s"https://www.googleapis.com/books/v1/volumes?q=$search%$term"))
-    // e.g. https://www.googleapis.com/books/v1/volumes?q=flowers+inauthor
-    // e.g. https://www.googleapis.com/books/v1/volumes?q=decagon+isbn:9781782276340
-  }
+  // e.g. https://www.googleapis.com/books/v1/volumes?q=flowers+inauthor
+  // e.g. https://www.googleapis.com/books/v1/volumes?q=decagon+isbn:9781782276340
+//  def getGoogleBook(urlOverride: Option[String] = None, search: String, term: String)(implicit ec: ExecutionContext): EitherT[Future, APIError, Book] = {
+//    connector.get[Book](urlOverride.getOrElse(s"https://www.googleapis.com/books/v1/volumes?q=$search%$term"))
+//  }
 
   def getGoogleCollection(urlOverride: Option[String] = None, search: String, term: String)(implicit ec: ExecutionContext): EitherT[Future, APIError, Collection] = {
     connector.get[Collection](urlOverride.getOrElse(s"https://www.googleapis.com/books/v1/volumes?q=$search%$term"))
@@ -23,7 +23,7 @@ class LibraryService @Inject()(connector: LibraryConnector) {
 
   def extractBooksFromCollection(collection: Collection): Seq[DataModel] = {
     collection.items.as[Seq[JsValue]].map {
-      book => convertBookToDataModel(book.as[Book])
+      bookJson => convertBookToDataModel(bookJson.as[Book])
     }
   }
 
