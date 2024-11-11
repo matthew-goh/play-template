@@ -16,7 +16,7 @@ import play.api.test.CSRFTokenHelper.CSRFFRequestHeader
 import play.api.test.FakeRequest
 import play.api.test.Helpers.{GET, POST}
 import repositories.DataRepository
-import services.LibraryService
+import services.{LibraryService, RepositoryService}
 
 import scala.concurrent.ExecutionContext
 
@@ -29,6 +29,7 @@ trait BaseSpecWithApplication extends BaseSpec with GuiceOneServerPerSuite with 
 
   // created instances of the controller components and data repository - new instances will be made for each suite run
   lazy val component: MessagesControllerComponents = injector.instanceOf[MessagesControllerComponents]
+  lazy val repoService: RepositoryService = injector.instanceOf[RepositoryService]
   lazy val repository: DataRepository = injector.instanceOf[DataRepository]
   lazy val service: LibraryService = injector.instanceOf[LibraryService]
   lazy val connector: LibraryConnector = injector.instanceOf[LibraryConnector]

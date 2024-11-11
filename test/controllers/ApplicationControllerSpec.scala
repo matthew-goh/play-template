@@ -23,7 +23,7 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
   val mockLibraryService: LibraryService = mock[LibraryService]
 
   val TestApplicationController = new ApplicationController(
-    repository,
+    repoService,
     mockLibraryService,
     component // comes from BaseSpecWithApplication
   )

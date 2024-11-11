@@ -1,5 +1,6 @@
 package repositories
 
+import com.google.inject.ImplementedBy
 import models.{APIError, DataModel}
 import org.mongodb.scala.bson.conversions.Bson
 import org.mongodb.scala.model.Filters.empty
@@ -26,7 +27,7 @@ class DataRepository @Inject()(mongoComponent: MongoComponent)
     Indexes.ascending("_id")
   )), // can ensure the bookId to be unique
   replaceIndexes = false
-) {
+) with DataRepositoryTrait {
   // list all DataModels in the database (one DataModel is one book)
   def index(): Future[Either[APIError.BadAPIResponse, Seq[DataModel]]]  = {
     try {
@@ -101,6 +102,7 @@ class DataRepository @Inject()(mongoComponent: MongoComponent)
       case e: Exception => Future(Left(APIError.BadAPIResponse(500, "Unable to update book")))
     }
   }
+  // Right result is e.g. AcknowledgedUpdateResult{matchedCount=1, modifiedCount=1, upsertedId=null}
 
   def updateWithValue(id: String, field: String, newValue: String): Future[Either[APIError, result.UpdateResult]] = {
     field match {
@@ -154,4 +156,15 @@ class DataRepository @Inject()(mongoComponent: MongoComponent)
   // remove all data from Mongo with the same collection name
   def deleteAll(): Future[Unit] = collection.deleteMany(empty()).toFuture().map(_ => ()) // needed for tests
 
+}
+
+@ImplementedBy(classOf[DataRepository])
+trait DataRepositoryTrait {
+  def index(): Future[Either[APIError.BadAPIResponse, Seq[DataModel]]]
+  def create(book: DataModel): Future[Either[APIError.BadAPIResponse, DataModel]]
+  def read(id: String): Future[Either[APIError, DataModel]]
+  def readBySpecifiedField(field: String, value: String): Future[Either[APIError, Seq[DataModel]]]
+  def update(id: String, book: DataModel): Future[Either[APIError, result.UpdateResult]]
+  def updateWithValue(id: String, field: String, newValue: String): Future[Either[APIError, result.UpdateResult]]
+  def delete(id: String): Future[Either[APIError, result.DeleteResult]]
 }
