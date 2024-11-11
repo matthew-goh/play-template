@@ -1,7 +1,8 @@
 package connectors
 
 import cats.data.EitherT
-import models.APIError
+import models.{APIError, Collection}
+import play.api.libs.json.JsPath.json
 import play.api.libs.json._
 import play.api.libs.ws.{WSClient, WSResponse}
 
@@ -20,9 +21,15 @@ class LibraryConnector @Inject()(ws: WSClient) {
       response
         .map {
           result => Right(result.json.as[Response])
+
+//            // shouldn't give an error if search returned no results
+//            if (result.json("totalItems").as[Int] == 0) {
+//              print("Hi")
+//              Right(Collection(result.json("kind").as[String], result.json("totalItems").as[Int]))
+//            } else Right(result.json.as[Response])
         }
-        .recover { case _: WSResponse =>
-          Left(APIError.BadAPIResponse(500, "Could not connect"))
+        .recover { //case _: WSResponse =>
+          case _ => Left(APIError.BadAPIResponse(500, "Could not connect"))
         }
     }
   }

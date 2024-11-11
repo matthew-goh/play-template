@@ -36,7 +36,7 @@ class LibraryServiceSpec extends BaseSpec with MockFactory with ScalaFutures wit
 
       // allows for the result to be waited for as the Future type can be seen as a placeholder for a value we don't have yet
       whenReady(testService.getGoogleCollection(urlOverride = Some(url), search = "", term = "").value) { result =>
-        result shouldBe Right(Collection("books#volumes", 1, LibraryServiceSpec.testAPIItems))
+        result shouldBe Right(Collection("books#volumes", 1, Some(LibraryServiceSpec.testAPIItems)))
       }
     }
 
@@ -156,7 +156,7 @@ object LibraryServiceSpec {
   val testAPIVolumeInfoNoDesc: JsValue = Json.parse(
     """{"title": "The Decagon House Murders", "authors": ["Yukito Ayatsuji"], "publisher": "Pushkin Vertigo", "publishedDate": "2021-05-25", "pageCount": 289}""".stripMargin)
 
-  val testAPICollection: Collection = Collection("books#volumes", 1, testAPIItems)
+  val testAPICollection: Collection = Collection("books#volumes", 1, Some(testAPIItems))
   val testAPIBook: Book = Book("1GIrEAAAQBAJ", testAPIVolumeInfo)
   val testAPIBookNoDesc: Book = Book("1GIrEAAAQBAJ", testAPIVolumeInfoNoDesc)
   val testAPIDataModel: DataModel = DataModel("1GIrEAAAQBAJ", "The Decagon House Murders",

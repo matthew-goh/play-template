@@ -1,0 +1,21 @@
+@(bookList: Seq[DataModel])
+@main("Find Book"){
+  <h1>Google Books API Project</h1>
+
+  <h2>Book details</h2>
+  @if(bookList.isEmpty) {
+    <p>No books found.</p>
+  } else {
+    <ul>
+    @for(book <- bookList) {
+      <li>
+        <p>Book ID: @book._id</p>
+        <p>Title: @book.name</p>
+        <p>Description: @book.description</p>
+        <p>Page count: @book.pageCount</p>
+        <p>//</p>
+      </li>
+    }
+    </ul>
+  }
+}

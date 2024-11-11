@@ -5,7 +5,7 @@ import models.{APIError, DataModel}
 import org.mongodb.scala.bson.conversions.Bson
 import org.mongodb.scala.model.Filters.empty
 import org.mongodb.scala.model._
-import org.mongodb.scala.result
+import org.mongodb.scala.{result}
 import uk.gov.hmrc.mongo.MongoComponent
 import uk.gov.hmrc.mongo.play.json.PlayMongoRepository
 
@@ -41,7 +41,9 @@ class DataRepository @Inject()(mongoComponent: MongoComponent)
   // add a DataModel object to database
   def create(book: DataModel): Future[Either[APIError.BadAPIResponse, DataModel]] = {
     try {
-      collection.insertOne(book).toFuture().map(_ => Right(book))
+      collection.insertOne(book).toFuture()
+        .map(_ => Right(book))
+        .recover { case _ => Left(APIError.BadAPIResponse(500, "Unable to add book")) }
     }
     catch {
       case e: Exception => Future(Left(APIError.BadAPIResponse(500, "Unable to add book")))

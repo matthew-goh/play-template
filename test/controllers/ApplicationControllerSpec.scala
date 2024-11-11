@@ -78,6 +78,17 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
       afterEach()
     }
 
+    "return a BadRequest if the book ID is already in the database" in {
+      beforeEach()
+      val request: FakeRequest[JsValue] = buildPost("/api").withBody[JsValue](Json.toJson(dataModel))
+      val createdResult: Future[Result] = TestApplicationController.create()(request)
+
+      val duplicateRequest: FakeRequest[JsValue] = buildPost("/api").withBody[JsValue](Json.toJson(dataModel))
+      val duplicateResult: Future[Result] = TestApplicationController.create()(duplicateRequest)
+      status(duplicateResult) shouldBe Status.BAD_REQUEST
+      afterEach()
+    }
+
     "return a BadRequest if the request body could not be parsed into a DataModel" in {
       beforeEach()
       val request: FakeRequest[JsValue] = buildPost("/api").withBody[JsValue](Json.toJson("abcd"))

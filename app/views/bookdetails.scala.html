@@ -1,0 +1,10 @@
+@(bookData: DataModel)
+@main("Find Book"){
+  <h1>Google Books API Project</h1>
+
+  <h2>Book details</h2>
+  <p>Book ID: @bookData._id</p>
+  <p>Title: @bookData.name</p>
+  <p>Description: @bookData.description</p>
+  <p>Page count: @bookData.pageCount</p>
+}
