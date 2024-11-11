@@ -3,7 +3,7 @@ package controllers
 import models.DataModel
 import play.api.libs.json._
 import play.api.mvc._
-import repositories.DataRepository
+import play.filters.csrf.CSRF
 import services.{LibraryService, RepositoryService}
 
 import javax.inject._
@@ -11,7 +11,40 @@ import scala.concurrent.{ExecutionContext, Future}
 
 @Singleton
 class ApplicationController @Inject()(repoService: RepositoryService, service: LibraryService, val controllerComponents: ControllerComponents)
-                                     (implicit ec: ExecutionContext) extends BaseController {
+                                     (implicit ec: ExecutionContext) extends BaseController with play.api.i18n.I18nSupport {
+
+  def accessToken(implicit request: Request[_]) = {
+    CSRF.getToken
+  }
+
+  // access form to add book
+  def addBook(): Action[AnyContent] = Action.async {implicit request =>
+    Future.successful(Ok(views.html.add(DataModel.dataForm)))
+  }
+  // called when add book form is submitted
+  def addBookForm(): Action[AnyContent] =  Action.async {implicit request =>
+    accessToken //call the accessToken method
+    DataModel.dataForm.bindFromRequest().fold( //from the implicit request we want to bind this to the form in our companion object
+      formWithErrors => {
+        //here write what you want to do if the form has errors
+        Future.successful(BadRequest(views.html.add(formWithErrors)))
+      },
+      formData => {
+        //here write how you would use this data to create a new book (DataModel)
+        //val book = DataModel(formData._id, formData.name, formData.description, formData.pageCount)
+        repoService.create(formData).map{
+          case Right(_) => Ok("Book added successfully!")
+          case Left(error) => {
+            error.reason match {
+              case "Bad response from upstream; got status: 500, and got reason: Book already exists in database"
+                => BadRequest("A book with the same ID already exists in the database.")
+              case _ => BadRequest("Unable to add book.")
+            }
+          }
+        }
+      }
+    )
+  }
 
   def showBookDetails(id: String): Action[AnyContent] = Action.async {implicit request =>
     val badBook = DataModel("Not found", "N/A", "N/A", 0)
@@ -19,11 +52,25 @@ class ApplicationController @Inject()(repoService: RepositoryService, service: L
       case Right(item) => Ok(views.html.bookdetails(item))
       case Left(error) => BadRequest(views.html.bookdetails(badBook))
     }
-//    Future.successful(Ok(views.html.example(bookData)))
+  }
+
+  def searchBooksAndDisplay(search: String, term: String): Action[AnyContent] = Action.async { implicit request =>
+    // Step 1: get raw search results
+    service.getGoogleCollection(search = search, term = term).value.map {
+      case Right(collection) => {
+        // Step 2: convert to list of DataModels
+        val bookList: Seq[DataModel] = service.extractBooksFromCollection(collection)
+        // Step 3: add books to database (for ids not already there)
+        bookList.map(book => repoService.create(book))
+        // Step 4: display the search results on a webpage
+        Ok(views.html.searchresults(bookList))
+      }
+      case Left(error) => BadRequest {error.reason}
+      //      case Left(error) => BadRequest(views.html.index())
+    }
   }
 
   //  display a list of all DataModels in the database, selected without parameters
-//  def index() = Action(Ok) // return a 200 OK response to fulfill the test
   def index(): Action[AnyContent] = Action.async { implicit request =>
     repoService.index().map{ // dataRepository.index() is a Future[Either[APIError.BadAPIResponse, Seq[DataModel]]]
       case Right(item: Seq[DataModel]) => Ok {Json.toJson(item)}
@@ -101,22 +148,6 @@ class ApplicationController @Inject()(repoService: RepositoryService, service: L
         Ok {Json.toJson(service.extractBooksFromCollection(collection))}
       }
       case Left(error) => BadRequest {error.reason}
-    }
-  }
-
-  def searchBooksAndDisplay(search: String, term: String): Action[AnyContent] = Action.async { implicit request =>
-    // Step 1: get raw search results
-    service.getGoogleCollection(search = search, term = term).value.map {
-      case Right(collection) => {
-        // Step 2: convert to list of DataModels
-        val bookList: Seq[DataModel] = service.extractBooksFromCollection(collection)
-        // Step 3: add books to database (for ids not already there)
-        bookList.map(book => repoService.create(book))
-        // Step 4: display the search results on a webpage
-        Ok(views.html.searchresults(bookList))
-      }
-      case Left(error) => BadRequest {error.reason}
-//      case Left(error) => BadRequest(views.html.index())
     }
   }
 }

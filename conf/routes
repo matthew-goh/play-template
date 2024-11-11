@@ -4,6 +4,9 @@ GET     /     controllers.HomeController.index()
 GET     /bookdetails/:id                   controllers.ApplicationController.showBookDetails(id: String)
 GET     /searchresults/:search/:term       controllers.ApplicationController.searchBooksAndDisplay(search: String, term: String)
 
+GET     /add/form     controllers.ApplicationController.addBook()
+POST     /add/form     controllers.ApplicationController.addBookForm()
+
 GET     /api     controllers.ApplicationController.index()
 POST     /api/create     controllers.ApplicationController.create()
 GET     /api/:id     controllers.ApplicationController.read(id: String)

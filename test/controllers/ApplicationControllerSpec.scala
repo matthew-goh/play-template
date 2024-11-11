@@ -86,6 +86,7 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
       val duplicateRequest: FakeRequest[JsValue] = buildPost("/api").withBody[JsValue](Json.toJson(dataModel))
       val duplicateResult: Future[Result] = TestApplicationController.create()(duplicateRequest)
       status(duplicateResult) shouldBe Status.BAD_REQUEST
+      contentAsString(duplicateResult) shouldBe "Bad response from upstream; got status: 500, and got reason: Book already exists in database"
       afterEach()
     }
 

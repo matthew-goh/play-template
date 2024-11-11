@@ -1,5 +1,5 @@
 @(bookList: Seq[DataModel])
-@main("Find Book"){
+@main("Search Books"){
   <h1>Google Books API Project</h1>
 
   <h2>Book details</h2>
@@ -13,7 +13,6 @@
         <p>Title: @book.name</p>
         <p>Description: @book.description</p>
         <p>Page count: @book.pageCount</p>
-        <p>//</p>
       </li>
     }
     </ul>

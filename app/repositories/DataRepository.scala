@@ -43,7 +43,7 @@ class DataRepository @Inject()(mongoComponent: MongoComponent)
     try {
       collection.insertOne(book).toFuture()
         .map(_ => Right(book))
-        .recover { case _ => Left(APIError.BadAPIResponse(500, "Unable to add book")) }
+        .recover { case _ => Left(APIError.BadAPIResponse(500, "Book already exists in database")) }
     }
     catch {
       case e: Exception => Future(Left(APIError.BadAPIResponse(500, "Unable to add book")))

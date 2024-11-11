@@ -1,7 +1,7 @@
 package connectors
 
 import cats.data.EitherT
-import models.{APIError, Collection}
+import models.APIError
 import play.api.libs.json.JsPath.json
 import play.api.libs.json._
 import play.api.libs.ws.{WSClient, WSResponse}
