@@ -14,7 +14,7 @@ object DataModel {
       "_id" -> nonEmptyText,
       "name" -> nonEmptyText,
       "description" -> text,
-      "pageCount" -> number(min = 0, max = 2000)
+      "pageCount" -> number(min = 1, max = 2000)
     )(DataModel.apply)(DataModel.unapply)
   )
 }

@@ -29,11 +29,10 @@ class ApplicationController @Inject()(repoService: RepositoryService, service: L
         //here write what you want to do if the form has errors
         Future.successful(BadRequest(views.html.add(formWithErrors)))
       },
-      formData => {
+      formData => {  // formData is already a DataModel
         //here write how you would use this data to create a new book (DataModel)
-        //val book = DataModel(formData._id, formData.name, formData.description, formData.pageCount)
         repoService.create(formData).map{
-          case Right(_) => Ok("Book added successfully!")
+          case Right(_) => Ok(views.html.bookdetails(formData))
           case Left(error) => {
             error.reason match {
               case "Bad response from upstream; got status: 500, and got reason: Book already exists in database"
@@ -87,7 +86,7 @@ class ApplicationController @Inject()(repoService: RepositoryService, service: L
           case Left(error) => BadRequest {error.reason}
         }
       // dataRepository.create() is a Future[Either[APIError.BadAPIResponse, DataModel]
-      case JsError(_) => Future(BadRequest) // ensure correct return type
+      case JsError(_) => Future(BadRequest {"Invalid request body"}) // ensure correct return type
     }
   }
 
@@ -111,7 +110,7 @@ class ApplicationController @Inject()(repoService: RepositoryService, service: L
           case Right(_) => Accepted {Json.toJson(request.body)}
           case Left(error) => Status(error.httpResponseStatus)(error.reason)
         } // dataRepository.update() is a Future[Either[APIError, result.UpdateResult]]
-      case JsError(_) => Future(BadRequest)
+      case JsError(_) => Future(BadRequest {"Invalid request body"})
     }
   }
   def updateWithValue(id: String, field: String, newValue: String): Action[AnyContent] = Action.async { implicit request =>

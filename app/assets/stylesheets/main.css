@@ -76,3 +76,14 @@ img {
     height: auto;
     border-radius: 5px;
 }
+
+/* Tables */
+table {
+    border: 1px solid grey;
+    border-collapse: collapse; /* Ensures borders between cells do not double */
+}
+
+th, td {
+    border: 1px solid grey;
+    padding: 8px; /* Adds spacing inside the cells */
+}

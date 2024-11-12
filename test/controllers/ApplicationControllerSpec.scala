@@ -95,6 +95,7 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
       val request: FakeRequest[JsValue] = buildPost("/api").withBody[JsValue](Json.toJson("abcd"))
       val createdResult: Future[Result] = TestApplicationController.create()(request)
       status(createdResult) shouldBe Status.BAD_REQUEST
+      contentAsString(createdResult) shouldBe "Invalid request body"
       afterEach()
     }
   }
@@ -188,6 +189,7 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
       val badUpdateRequest: FakeRequest[JsValue] = buildPost("/api/${dataModel._id}").withBody[JsValue](Json.toJson("abcd"))
       val badUpdateResult = TestApplicationController.update("abcd")(badUpdateRequest)
       status(badUpdateResult) shouldBe Status.BAD_REQUEST
+      contentAsString(badUpdateResult) shouldBe "Invalid request body"
       afterEach()
     }
 

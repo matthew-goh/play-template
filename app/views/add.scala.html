@@ -4,7 +4,7 @@
 @(dataForm: Form[DataModel])(implicit request: RequestHeader, messages: Messages)
 
 @main("Add Book"){
-  <div>
+  <div class="container mb-5">
   @helper.form(action = routes.ApplicationController.addBookForm()) {
     @helper.CSRF.formField
     @helper.inputText(dataForm("_id"))
@@ -13,5 +13,9 @@
     @helper.inputText(dataForm("pageCount"))
     <input class="submitButton" type="submit" value="Submit">
     }
+  </div>
+
+  <div class="container mb-5">
+    <p><a href="@routes.HomeController.index()"> Back </a></p>
   </div>
 }
