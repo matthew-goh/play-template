@@ -8,6 +8,9 @@
   <p>Description: @bookData.description</p>
   <p>Page count: @bookData.pageCount</p>
 
+  <form action="@routes.ApplicationController.deleteBook(bookData._id)" method="GET">
+    <button type="submit">Delete</button>
+  </form>
   <br>
   <p><a href="@routes.HomeController.index()"> Back </a></p>
 }

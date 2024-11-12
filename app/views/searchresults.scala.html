@@ -1,4 +1,4 @@
-@(bookList: Seq[DataModel])
+@(bookList: Seq[DataModel], currentPage: Int = 1)
 @main("Search Books"){
   <h1>Google Books API Project</h1>
 
@@ -14,10 +14,13 @@
         <p>Description: @book.description</p>
         <p>Page count: @book.pageCount</p>
       </li>
+      <form action="@routes.ApplicationController.deleteBook(book._id)" method="GET">
+        <button type="submit">Delete</button>
+      </form>
+      <br>
     }
     </ul>
   }
-
   <br>
   <p><a href="@routes.HomeController.index()"> Back </a></p>
 }

@@ -149,7 +149,11 @@ class DataRepository @Inject()(mongoComponent: MongoComponent)
     try {
       collection.deleteOne(
         filter = byID(id)
-      ).toFuture().map(result => Right(result))
+      ).toFuture().map {
+        deleteResult =>
+        if (deleteResult.getDeletedCount == 0) Left(APIError.BadAPIResponse(404, "Book not found"))
+        else Right(deleteResult)
+      }
     }
     catch {
       case e: Exception => Future(Left(APIError.BadAPIResponse(500, "Unable to delete book")))

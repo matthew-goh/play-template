@@ -23,6 +23,9 @@ class ApplicationController @Inject()(repoService: RepositoryService, service: L
       case Left(error) => Status(error.httpResponseStatus)(error.reason)
     }
   }
+  //    val itemsPerPage = 5
+  //    val numBooks = bookList.length
+  //    val numPages = (numBooks / itemsPerPage) + (if (numBooks % itemsPerPage > 0) 1 else 0)
 
 //  def showBookDetails(id: String): Action[AnyContent] = Action.async {implicit request =>
 //    val badBook = DataModel("Not found", "N/A", "N/A", 0)
@@ -121,6 +124,13 @@ class ApplicationController @Inject()(repoService: RepositoryService, service: L
     )
   }
 
+  def deleteBook(id: String): Action[AnyContent] = Action.async { implicit request =>
+    repoService.delete(id).map{
+      case Right(_) => Ok(views.html.confirmation("Delete"))
+      case Left(error) => BadRequest(views.html.unsuccessful("Delete"))
+    }
+  }
+
 
   ///// API METHODS WITHOUT FRONTEND /////
   //  display a list of all DataModels in the database, selected without parameters
@@ -177,7 +187,7 @@ class ApplicationController @Inject()(repoService: RepositoryService, service: L
   def delete(id: String): Action[AnyContent] = Action.async { implicit request =>
     repoService.delete(id).map{
       case Right(_) => Accepted
-      case Left(error) => Status(error.httpResponseStatus)(error.reason)
+      case Left(error) => BadRequest {error.reason}
     } // dataRepository.delete() is a Future[Either[APIError, result.DeleteResult]]
   }
 

@@ -275,18 +275,26 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
       afterEach()
     }
 
-    "do nothing if the book could not be found" in {
+//    "do nothing if the book could not be found" in {
+//      beforeEach()
+//      val request: FakeRequest[JsValue] = buildGet("/api/${dataModel._id}").withBody[JsValue](Json.toJson(dataModel))
+//      val createdResult: Future[Result] = TestApplicationController.create()(request)
+//
+//      val deleteResult: Future[Result] = TestApplicationController.delete("aaaa")(FakeRequest())
+//      status(deleteResult) shouldBe Status.ACCEPTED
+//
+//      // check that database still contains dataModel
+//      val indexResult: Future[Result] = TestApplicationController.index()(FakeRequest())
+//      status(indexResult) shouldBe Status.OK
+//      contentAsJson(indexResult).as[Seq[DataModel]] shouldBe Seq(dataModel)
+//      afterEach()
+//    }
+
+    "return a BadRequest if the book could not be found" in {
       beforeEach()
-      val request: FakeRequest[JsValue] = buildGet("/api/${dataModel._id}").withBody[JsValue](Json.toJson(dataModel))
-      val createdResult: Future[Result] = TestApplicationController.create()(request)
-
       val deleteResult: Future[Result] = TestApplicationController.delete("aaaa")(FakeRequest())
-      status(deleteResult) shouldBe Status.ACCEPTED
-
-      // check that database still contains dataModel
-      val indexResult: Future[Result] = TestApplicationController.index()(FakeRequest())
-      status(indexResult) shouldBe Status.OK
-      contentAsJson(indexResult).as[Seq[DataModel]] shouldBe Seq(dataModel)
+      status(deleteResult) shouldBe Status.BAD_REQUEST
+      contentAsString(deleteResult) shouldBe "Bad response from upstream; got status: 404, and got reason: Book not found"
       afterEach()
     }
   }
