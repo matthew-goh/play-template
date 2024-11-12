@@ -1,4 +1,6 @@
-@()
+@import helper._
+
+@()(implicit request: RequestHeader)
 
 @main("Play Scala API demo") {
 
@@ -80,7 +82,19 @@
   </div>
 
   <div class="container mb-5">
+    <p><a href="@routes.ApplicationController.listAllBooks()"> Show all books in database </a></p>
     <p><a href="@routes.ApplicationController.addBook()"> Add a book </a></p>
+  </div>
+
+  <div class="container mb-5">
+    <h3>Search book by ID</h3>
+    @form(action = routes.ApplicationController.searchSingleBook()) {
+      @CSRF.formField
+      <div>
+        <input type="text" name="bookID" placeholder="Enter book ID" required>
+        <button type="submit">Search</button>
+      </div>
+    }
   </div>
 
 </div>

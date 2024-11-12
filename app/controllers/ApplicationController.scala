@@ -17,7 +17,36 @@ class ApplicationController @Inject()(repoService: RepositoryService, service: L
     CSRF.getToken
   }
 
-  // access form to add book
+  def listAllBooks(): Action[AnyContent] = Action.async {implicit request =>
+    repoService.index().map{ // dataRepository.index() is a Future[Either[APIError.BadAPIResponse, Seq[DataModel]]]
+      case Right(bookList: Seq[DataModel]) => Ok(views.html.searchgoogle(bookList))
+      case Left(error) => Status(error.httpResponseStatus)(error.reason)
+    }
+  }
+
+//  def showBookDetails(id: String): Action[AnyContent] = Action.async {implicit request =>
+//    val badBook = DataModel("Not found", "N/A", "N/A", 0)
+//    repoService.read(id).map{
+//      case Right(item) => Ok(views.html.bookdetails(item))
+//      case Left(error) => BadRequest(views.html.bookdetails(badBook))
+//    }
+//  }
+  def searchSingleBook(): Action[AnyContent] = Action.async {implicit request =>
+    accessToken
+    val badBook = DataModel("Not found", "N/A", "N/A", 0)
+    val idToSearch: Option[String] = request.body.asFormUrlEncoded.flatMap(_.get("bookID").flatMap(_.headOption))
+    idToSearch match {
+      case Some(id) => {
+        repoService.read(id).map{
+          case Right(item) => Ok(views.html.bookdetails(item))
+          case Left(error) => BadRequest(views.html.bookdetails(badBook))
+        }
+      }
+      case None => Future.successful(BadRequest(views.html.index()))
+    }
+  }
+
+  // access add book form
   def addBook(): Action[AnyContent] = Action.async {implicit request =>
     Future.successful(Ok(views.html.add(DataModel.dataForm)))
   }
@@ -45,14 +74,6 @@ class ApplicationController @Inject()(repoService: RepositoryService, service: L
     )
   }
 
-  def showBookDetails(id: String): Action[AnyContent] = Action.async {implicit request =>
-    val badBook = DataModel("Not found", "N/A", "N/A", 0)
-    repoService.read(id).map{
-      case Right(item) => Ok(views.html.bookdetails(item))
-      case Left(error) => BadRequest(views.html.bookdetails(badBook))
-    }
-  }
-
   def searchBooksAndDisplay(search: String, term: String): Action[AnyContent] = Action.async { implicit request =>
     // Step 1: get raw search results
     service.getGoogleCollection(search = search, term = term).value.map {
@@ -62,13 +83,15 @@ class ApplicationController @Inject()(repoService: RepositoryService, service: L
         // Step 3: add books to database (for ids not already there)
         bookList.map(book => repoService.create(book))
         // Step 4: display the search results on a webpage
-        Ok(views.html.searchresults(bookList))
+        Ok(views.html.searchgoogle(bookList))
       }
       case Left(error) => BadRequest {error.reason}
       //      case Left(error) => BadRequest(views.html.index())
     }
   }
 
+
+  ///// API METHODS WITHOUT FRONTEND /////
   //  display a list of all DataModels in the database, selected without parameters
   def index(): Action[AnyContent] = Action.async { implicit request =>
     repoService.index().map{ // dataRepository.index() is a Future[Either[APIError.BadAPIResponse, Seq[DataModel]]]

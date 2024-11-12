@@ -3,19 +3,18 @@ package controllers
 import baseSpec.BaseSpecWithApplication
 import cats.data.EitherT
 import models.{APIError, Collection, DataModel}
-import org.mongodb.scala.{MongoClient, MongoDatabase}
 import org.scalamock.scalatest.MockFactory
 import org.scalatestplus.play.guice.GuiceOneAppPerSuite
 import services.LibraryServiceSpec
 import org.scalatest.concurrent.ScalaFutures
+import play.filters.csrf.CSRF
+import play.api.test.CSRFTokenHelper._
 import play.api.test.FakeRequest
 import play.api.http.Status
 import play.api.libs.json._
-import play.api.mvc.{AnyContent, Result}
+import play.api.mvc._
 import play.api.test.Helpers._
-import repositories.DataRepository
 import services.LibraryService
-import uk.gov.hmrc.mongo.MongoComponent
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -332,6 +331,52 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
       val extractionResult: Future[Result] = TestApplicationController.getGoogleBookList(search = "", term = "")(FakeRequest())
       status(extractionResult) shouldBe BAD_REQUEST
       contentAsString(extractionResult) shouldBe "Bad response from upstream; got status: 500, and got reason: Could not connect"
+    }
+  }
+
+  "ApplicationController .addBookForm()" should {
+    "add a book to the database" in {
+      beforeEach()
+      val addBookRequest: FakeRequest[AnyContentAsFormUrlEncoded] = buildPost("/add/form").withFormUrlEncodedBody(
+        "_id" -> "abcd",
+        "name" -> "test name",
+        "description" -> "test description",
+        "pageCount" -> "100"
+      ) // .withCRSFToken not needed?
+      val addBookResult: Future[Result] = TestApplicationController.addBookForm()(addBookRequest)
+      status(addBookResult) shouldBe Status.OK
+      // println(contentAsString(addBookResult))
+      afterEach()
+    }
+
+    "detect a form with errors" in {
+      beforeEach()
+      val addBookRequest: FakeRequest[AnyContentAsFormUrlEncoded] = buildPost("/add/form").withFormUrlEncodedBody(
+        "_id" -> "abcd",
+        "name" -> "",
+        "description" -> "test description",
+        "pageCount" -> "100"
+      ) // .withCRSFToken not needed?
+      val addBookResult: Future[Result] = TestApplicationController.addBookForm()(addBookRequest)
+      status(addBookResult) shouldBe Status.BAD_REQUEST
+      afterEach()
+    }
+
+    "return a BadRequest if the book ID is already in the database" in {
+      beforeEach()
+      val request: FakeRequest[JsValue] = buildGet("/add/form").withBody[JsValue](Json.toJson(dataModel))
+      val createdResult: Future[Result] = TestApplicationController.create()(request)
+
+      val addBookRequest: FakeRequest[AnyContentAsFormUrlEncoded] = buildPost("/add/form").withFormUrlEncodedBody(
+        "_id" -> "abcd",
+        "name" -> "test name",
+        "description" -> "test description",
+        "pageCount" -> "100"
+      ) // .withCRSFToken not needed?
+      val addBookResult: Future[Result] = TestApplicationController.addBookForm()(addBookRequest)
+      status(addBookResult) shouldBe Status.BAD_REQUEST
+      contentAsString(addBookResult) shouldBe "A book with the same ID already exists in the database."
+      afterEach()
     }
   }
 

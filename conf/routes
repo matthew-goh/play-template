@@ -1,11 +1,12 @@
-# An bookdetails controller showing a sample home page
+# A bookdetails controller showing a sample home page
 GET     /     controllers.HomeController.index()
 
-GET     /bookdetails/:id                   controllers.ApplicationController.showBookDetails(id: String)
-GET     /searchresults/:search/:term       controllers.ApplicationController.searchBooksAndDisplay(search: String, term: String)
-
+GET     /allbooks                 controllers.ApplicationController.listAllBooks()
 GET     /add/form     controllers.ApplicationController.addBook()
 POST     /add/form     controllers.ApplicationController.addBookForm()
+#GET     /bookdetails/:id          controllers.ApplicationController.showBookDetails(id: String)
+POST    /search                   controllers.ApplicationController.searchSingleBook()
+GET     /searchgoogle/:search/:term       controllers.ApplicationController.searchBooksAndDisplay(search: String, term: String)
 
 GET     /api     controllers.ApplicationController.index()
 POST     /api/create     controllers.ApplicationController.create()

@@ -1,6 +1,7 @@
 @import models.DataModel
 @import helper._
 
+@*RequestHeader needed for form with CRSF, messages needed for specific form defined in DataModel*@
 @(dataForm: Form[DataModel])(implicit request: RequestHeader, messages: Messages)
 
 @main("Add Book"){
