@@ -4,17 +4,17 @@
 @*RequestHeader needed for form with CRSF, messages needed for specific form defined in DataModel*@
 @(dataForm: Form[DataModel])(implicit request: RequestHeader, messages: Messages)
 
-@main("Add Book"){
+@main("Update Book"){
   <div class="container mb-5">
-    <h2>Add a book</h2>
-    @helper.form(action = routes.ApplicationController.addBookForm()) {
+    <h2>Update book: @dataForm("_id").value</h2>
+    @helper.form(action = routes.ApplicationController.updateBookForm()) {
       @helper.CSRF.formField
-      @helper.inputText(dataForm("_id"), Symbol("_label") -> "ID")
+      @helper.inputText(dataForm("_id"), Symbol("_label") -> "ID", Symbol("readonly") -> "readonly")
       @helper.inputText(dataForm("name"), Symbol("_label") -> "Name")
       @helper.inputText(dataForm("description"), Symbol("_label") -> "Description")
       @helper.inputText(dataForm("pageCount"), Symbol("_label") -> "Page count")
       <input class="submitButton" type="submit" value="Submit">
-      }
+    }
     <br>
     <p><a href="@routes.HomeController.index()"> Back </a></p>
   </div>

@@ -115,7 +115,7 @@ class ApplicationController @Inject()(repoService: RepositoryService, service: L
           case Left(error) => {
             error.reason match {
               case "Bad response from upstream; got status: 500, and got reason: Book already exists in database"
-                => BadRequest("A book with the same ID already exists in the database.")
+                => BadRequest(views.html.unsuccessful("Book ID already exists in database"))
               case _ => BadRequest("Unable to add book.")
             }
           }
@@ -124,10 +124,35 @@ class ApplicationController @Inject()(repoService: RepositoryService, service: L
     )
   }
 
+  // access update book form
+  def updateBook(id: String): Action[AnyContent] = Action.async {implicit request =>
+    repoService.read(id).map {
+      case Right(book) =>
+        val filledForm = DataModel.dataForm.fill(book)  // Pre-fill the form with data from the database
+//        println(filledForm.)
+        Ok(views.html.update(filledForm))  // Render the form in the view
+      case Left(error) => BadRequest(views.html.unsuccessful("Book not found in database"))
+    }
+  }
+  def updateBookForm(): Action[AnyContent] =  Action.async {implicit request =>
+    accessToken //call the accessToken method
+    DataModel.dataForm.bindFromRequest().fold( //from the implicit request we want to bind this to the form in our companion object
+      formWithErrors => {
+        Future.successful(BadRequest(views.html.update(formWithErrors)))
+      },
+      formData => {  // formData is already a DataModel
+        repoService.update(formData._id, formData).map{
+          case Right(_) => Ok(views.html.bookdetails(formData))
+          case Left(error) => BadRequest(views.html.unsuccessful("Book not updated"))
+        }
+      }
+    )
+  }
+
   def deleteBook(id: String): Action[AnyContent] = Action.async { implicit request =>
     repoService.delete(id).map{
       case Right(_) => Ok(views.html.confirmation("Delete"))
-      case Left(error) => BadRequest(views.html.unsuccessful("Delete"))
+      case Left(error) => BadRequest(views.html.unsuccessful("Book not found in database"))
     }
   }
 

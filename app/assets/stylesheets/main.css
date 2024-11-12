@@ -70,6 +70,12 @@ button:hover {
     background-color: #2980b9;
 }
 
+.button-form {
+    display: inline-block;
+    margin-right: 10px;
+    margin-bottom: 15px;
+}
+
 /* Images */
 img {
     max-width: 100%;

@@ -14,10 +14,12 @@
         <p>Description: @book.description</p>
         <p>Page count: @book.pageCount</p>
       </li>
-      <form action="@routes.ApplicationController.deleteBook(book._id)" method="GET">
+      <form action="@routes.ApplicationController.updateBook(book._id)" method="GET" class="button-form">
+        <button type="submit">Update</button>
+      </form>
+      <form action="@routes.ApplicationController.deleteBook(book._id)" method="GET" class="button-form">
         <button type="submit">Delete</button>
       </form>
-      <br>
     }
     </ul>
   }

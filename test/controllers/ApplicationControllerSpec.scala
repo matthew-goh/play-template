@@ -383,7 +383,7 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
       ) // .withCRSFToken not needed?
       val addBookResult: Future[Result] = TestApplicationController.addBookForm()(addBookRequest)
       status(addBookResult) shouldBe Status.BAD_REQUEST
-      contentAsString(addBookResult) shouldBe "A book with the same ID already exists in the database."
+      contentAsString(addBookResult) should include ("Book ID already exists in database")
       afterEach()
     }
   }
