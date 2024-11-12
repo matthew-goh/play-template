@@ -12,7 +12,7 @@ import scala.concurrent.{ExecutionContext, Future}
 @Singleton
 class ApplicationController @Inject()(repoService: RepositoryService, service: LibraryService, val controllerComponents: ControllerComponents)
                                      (implicit ec: ExecutionContext) extends BaseController with play.api.i18n.I18nSupport {
-
+  ///// METHODS CALLED BY FRONTEND /////
   def accessToken(implicit request: Request[_]) = {
     CSRF.getToken
   }
@@ -50,7 +50,6 @@ class ApplicationController @Inject()(repoService: RepositoryService, service: L
   }
   def searchBookByTitle(): Action[AnyContent] = Action.async {implicit request =>
     accessToken
-    val badBook = DataModel("Not found", "N/A", "N/A", 0)
     val titleToSearch: Option[String] = request.body.asFormUrlEncoded.flatMap(_.get("title").flatMap(_.headOption))
     titleToSearch match {
       case Some(title) => {

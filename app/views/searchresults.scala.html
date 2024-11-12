@@ -1,6 +1,8 @@
-@(bookList: Seq[DataModel], currentPage: Int = 1)
+@(bookList: Seq[DataModel])
 @main("Search Books"){
   <h1>Google Books API Project</h1>
+
+  <p><a href="@routes.HomeController.index()"> Back </a></p>
 
   <h2>Book details</h2>
   @if(bookList.isEmpty) {
@@ -23,6 +25,4 @@
     }
     </ul>
   }
-  <br>
-  <p><a href="@routes.HomeController.index()"> Back </a></p>
 }
