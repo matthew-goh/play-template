@@ -60,7 +60,8 @@ class DataRepository @Inject()(mongoComponent: MongoComponent)
 //    )
   private def bySpecifiedField(field: String, value: String): Bson =
     Filters.and(
-      Filters.equal(field, value)
+//      Filters.equal(field, value)
+        Filters.regex(field, s".*${value}.*", "i") // case-insensitive regex filter, containing search value
     )
 
   // retrieve a DataModel object from database - uses an id parameter

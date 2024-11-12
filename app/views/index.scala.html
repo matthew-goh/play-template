@@ -88,10 +88,33 @@
 
   <div class="container mb-5">
     <h3>Search book by ID</h3>
-    @form(action = routes.ApplicationController.searchSingleBook()) {
+    @form(action = routes.ApplicationController.searchBookByID()) {
       @CSRF.formField
       <div>
         <input type="text" name="bookID" placeholder="Enter book ID" required>
+        <button type="submit">Search</button>
+      </div>
+    }
+    <br>
+    <h3>Search book by title</h3>
+    @form(action = routes.ApplicationController.searchBookByTitle()) {
+      @CSRF.formField
+      <div>
+        <input type="text" name="title" placeholder="Enter title" required>
+        <button type="submit">Search</button>
+      </div>
+    }
+    <br>
+    <h3>Search Google Books API</h3>
+    <p> Books will be added to database </p>
+    <p> Format is <i>https://www.googleapis.com/books/v1/volumes?q=<b>(search)</b>+<b>(term)</b></i> </p>
+    <p> e.g. search = decagon, term = isbn:9781782276340 <br>
+      => https://www.googleapis.com/books/v1/volumes?q=<b>decagon</b>+<b>isbn:9781782276340</b> </p>
+    @form(action = routes.ApplicationController.searchGoogleAndDisplay()) {
+      @CSRF.formField
+      <div>
+        <input type="text" name="search" placeholder="search">
+        <input type="text" name="term" placeholder="term">
         <button type="submit">Search</button>
       </div>
     }

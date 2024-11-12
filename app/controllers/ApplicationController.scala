@@ -19,7 +19,7 @@ class ApplicationController @Inject()(repoService: RepositoryService, service: L
 
   def listAllBooks(): Action[AnyContent] = Action.async {implicit request =>
     repoService.index().map{ // dataRepository.index() is a Future[Either[APIError.BadAPIResponse, Seq[DataModel]]]
-      case Right(bookList: Seq[DataModel]) => Ok(views.html.searchgoogle(bookList))
+      case Right(bookList: Seq[DataModel]) => Ok(views.html.searchresults(bookList))
       case Left(error) => Status(error.httpResponseStatus)(error.reason)
     }
   }
@@ -31,7 +31,7 @@ class ApplicationController @Inject()(repoService: RepositoryService, service: L
 //      case Left(error) => BadRequest(views.html.bookdetails(badBook))
 //    }
 //  }
-  def searchSingleBook(): Action[AnyContent] = Action.async {implicit request =>
+  def searchBookByID(): Action[AnyContent] = Action.async {implicit request =>
     accessToken
     val badBook = DataModel("Not found", "N/A", "N/A", 0)
     val idToSearch: Option[String] = request.body.asFormUrlEncoded.flatMap(_.get("bookID").flatMap(_.headOption))
@@ -43,6 +43,53 @@ class ApplicationController @Inject()(repoService: RepositoryService, service: L
         }
       }
       case None => Future.successful(BadRequest(views.html.index()))
+    }
+  }
+  def searchBookByTitle(): Action[AnyContent] = Action.async {implicit request =>
+    accessToken
+    val badBook = DataModel("Not found", "N/A", "N/A", 0)
+    val titleToSearch: Option[String] = request.body.asFormUrlEncoded.flatMap(_.get("title").flatMap(_.headOption))
+    titleToSearch match {
+      case Some(title) => {
+        repoService.readBySpecifiedField("name", title).map{
+          case Right(books) => Ok(views.html.searchresults(books))
+          case Left(error) => BadRequest(views.html.searchresults(Seq()))
+        }
+      }
+      case None => Future.successful(BadRequest(views.html.searchresults(Seq())))
+    }
+  }
+
+  def searchGoogleAndDisplay(): Action[AnyContent] = Action.async { implicit request =>
+    accessToken
+    // Step 0: process submitted search
+    val searchSubmit: Option[String] = request.body.asFormUrlEncoded.flatMap(_.get("search").flatMap(_.headOption))
+    val termSubmit: Option[String] = request.body.asFormUrlEncoded.flatMap(_.get("term").flatMap(_.headOption))
+
+    val search = searchSubmit match {
+      case Some(text) => text
+      case None => ""
+    }
+    val term = termSubmit match {
+      case Some(text) => text
+      case None => ""
+    }
+
+    if (search == "" && term == "") Future.successful(BadRequest(views.html.searchresults(Seq())))
+    else {
+      // Step 1: get raw search results
+      service.getGoogleCollection(search = search, term = term).value.map {
+        case Right(collection) => {
+          // Step 2: convert to list of DataModels
+          val bookList: Seq[DataModel] = service.extractBooksFromCollection(collection)
+          // Step 3: add books to database (for ids not already there)
+          bookList.map(book => repoService.create(book))
+          // Step 4: display the search results on a webpage
+          Ok(views.html.searchresults(bookList))
+        }
+        //      case Left(error) => BadRequest {error.reason}
+        case Left(error) => BadRequest(views.html.index())
+      }
     }
   }
 
@@ -72,22 +119,6 @@ class ApplicationController @Inject()(repoService: RepositoryService, service: L
         }
       }
     )
-  }
-
-  def searchBooksAndDisplay(search: String, term: String): Action[AnyContent] = Action.async { implicit request =>
-    // Step 1: get raw search results
-    service.getGoogleCollection(search = search, term = term).value.map {
-      case Right(collection) => {
-        // Step 2: convert to list of DataModels
-        val bookList: Seq[DataModel] = service.extractBooksFromCollection(collection)
-        // Step 3: add books to database (for ids not already there)
-        bookList.map(book => repoService.create(book))
-        // Step 4: display the search results on a webpage
-        Ok(views.html.searchgoogle(bookList))
-      }
-      case Left(error) => BadRequest {error.reason}
-      //      case Left(error) => BadRequest(views.html.index())
-    }
   }
 
 

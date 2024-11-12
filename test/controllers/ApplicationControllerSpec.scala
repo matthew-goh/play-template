@@ -140,7 +140,7 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
       val request: FakeRequest[JsValue] = buildGet("/api/${dataModel._id}").withBody[JsValue](Json.toJson(dataModel))
       val createdResult: Future[Result] = TestApplicationController.create()(request)
 
-      val readResult: Future[Result] = TestApplicationController.readBySpecifiedField("name", "test name")(FakeRequest())
+      val readResult: Future[Result] = TestApplicationController.readBySpecifiedField("name", "Test Name")(FakeRequest())
       status(readResult) shouldBe Status.OK
       contentAsJson(readResult).as[Seq[DataModel]] shouldBe Seq(dataModel)
       afterEach()
@@ -151,7 +151,7 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
       val request: FakeRequest[JsValue] = buildGet("/api/${dataModel._id}").withBody[JsValue](Json.toJson(dataModel))
       val createdResult: Future[Result] = TestApplicationController.create()(request)
 
-      val readResult: Future[Result] = TestApplicationController.readBySpecifiedField("description", "test description")(FakeRequest())
+      val readResult: Future[Result] = TestApplicationController.readBySpecifiedField("description", "test DESCRIPTION")(FakeRequest())
       status(readResult) shouldBe Status.OK
       contentAsJson(readResult).as[Seq[DataModel]] shouldBe Seq(dataModel)
       afterEach()

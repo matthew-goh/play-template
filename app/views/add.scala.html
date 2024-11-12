@@ -6,17 +6,16 @@
 
 @main("Add Book"){
   <div class="container mb-5">
-  @helper.form(action = routes.ApplicationController.addBookForm()) {
-    @helper.CSRF.formField
-    @helper.inputText(dataForm("_id"))
-    @helper.inputText(dataForm("name"))
-    @helper.inputText(dataForm("description"))
-    @helper.inputText(dataForm("pageCount"))
-    <input class="submitButton" type="submit" value="Submit">
-    }
-  </div>
-
-  <div class="container mb-5">
+    <h2>Add a book</h2>
+    @helper.form(action = routes.ApplicationController.addBookForm()) {
+      @helper.CSRF.formField
+      @helper.inputText(dataForm("_id"))
+      @helper.inputText(dataForm("name"))
+      @helper.inputText(dataForm("description"))
+      @helper.inputText(dataForm("pageCount"))
+      <input class="submitButton" type="submit" value="Submit">
+      }
+    <br>
     <p><a href="@routes.HomeController.index()"> Back </a></p>
   </div>
 }
