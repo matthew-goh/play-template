@@ -387,13 +387,13 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
       afterEach()
     }
 
-    "return a BadRequest if the book is not in the database" in {
+    "return a NotFound if the book is not in the database" in {
       beforeEach()
       val searchRequest: FakeRequest[AnyContentAsFormUrlEncoded] = buildPost("/searchid").withFormUrlEncodedBody(
         "bookID" -> "abcd"
       ) // .withCRSFToken not needed?
       val searchResult: Future[Result] = TestApplicationController.searchBookByID()(searchRequest)
-      status(searchResult) shouldBe Status.BAD_REQUEST
+      status(searchResult) shouldBe Status.NOT_FOUND
       contentAsString(searchResult) should include ("Not found")
       afterEach()
     }
@@ -443,7 +443,8 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
 
       val searchRequest: FakeRequest[AnyContentAsFormUrlEncoded] = buildPost("/searchgoogle").withFormUrlEncodedBody(
         "search" -> "something",
-        "term" -> "inauthor:something"
+        "keyword" -> "inauthor",
+        "term_value" -> "something"
       ) // .withCRSFToken not needed?
       val searchResult: Future[Result] = TestApplicationController.searchGoogleAndDisplay()(searchRequest)
       status(searchResult) shouldBe Status.OK
@@ -466,7 +467,8 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
 
       val searchRequest: FakeRequest[AnyContentAsFormUrlEncoded] = buildPost("/searchgoogle").withFormUrlEncodedBody(
         "search" -> "something",
-        "term" -> "inauthor:something"
+        "keyword" -> "inauthor",
+        "term_value" -> "something"
       ) // .withCRSFToken not needed?
       val searchResult: Future[Result] = TestApplicationController.searchGoogleAndDisplay()(searchRequest)
       status(searchResult) shouldBe Status.OK
@@ -476,12 +478,46 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
 
     "show 'no books found' if search and term are both blank" in {
       val searchRequest: FakeRequest[AnyContentAsFormUrlEncoded] = buildPost("/searchgoogle").withFormUrlEncodedBody(
-        "search" -> "",
-        "term" -> ""
+        "search" -> "something",
+        "keyword" -> "",
+        "term_value" -> "something"
       ) // .withCRSFToken not needed?
       val searchResult: Future[Result] = TestApplicationController.searchGoogleAndDisplay()(searchRequest)
       status(searchResult) shouldBe Status.BAD_REQUEST
       contentAsString(searchResult) should include ("No books found")
+    }
+  }
+
+  "ApplicationController .addFromSearch()" should {
+    "add a book to the database" in {
+      beforeEach()
+      val addBookRequest: FakeRequest[AnyContentAsFormUrlEncoded] = buildPost("/addfromsearch").withFormUrlEncodedBody(
+        "_id" -> "abcd",
+        "name" -> "test name",
+        "description" -> "test description",
+        "pageCount" -> "100"
+      ) // .withCRSFToken not needed?
+      val addBookResult: Future[Result] = TestApplicationController.addFromSearch()(addBookRequest)
+      status(addBookResult) shouldBe Status.OK
+      contentAsString(addBookResult) should include ("test name")
+      afterEach()
+    }
+
+    "return a BadRequest if the book ID is already in the database" in {
+      beforeEach()
+      val request: FakeRequest[JsValue] = buildPost("/api").withBody[JsValue](Json.toJson(dataModel))
+      val createdResult: Future[Result] = TestApplicationController.create()(request)
+
+      val addBookRequest: FakeRequest[AnyContentAsFormUrlEncoded] = buildPost("/addfromsearch").withFormUrlEncodedBody(
+        "_id" -> "abcd",
+        "name" -> "test name",
+        "description" -> "test description",
+        "pageCount" -> "100"
+      ) // .withCRSFToken not needed?
+      val addBookResult: Future[Result] = TestApplicationController.addFromSearch()(addBookRequest)
+      status(addBookResult) shouldBe Status.BAD_REQUEST
+      contentAsString(addBookResult) should include ("Book ID already exists in database")
+      afterEach()
     }
   }
 
@@ -545,6 +581,7 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
       ) // .withCRSFToken not needed?
       val updateBookResult: Future[Result] = TestApplicationController.updateBookForm()(updateBookRequest)
       status(updateBookResult) shouldBe Status.OK
+      contentAsString(updateBookResult) should include ("new name")
       afterEach()
     }
 

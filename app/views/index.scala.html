@@ -106,15 +106,26 @@
     }
     <br>
     <h3>Search Google Books API</h3>
-    <p> Books will be added to database </p>
-    <p> Format is <i>https://www.googleapis.com/books/v1/volumes?q=<b>(search)</b>+<b>(term)</b></i> </p>
-    <p> e.g. search = decagon, term = isbn:9781782276340 <br>
-      => https://www.googleapis.com/books/v1/volumes?q=<b>decagon</b>+<b>isbn:9781782276340</b> </p>
+@*    <p> Books will be added to database </p>*@
+    <p> Format is <i>https://www.googleapis.com/books/v1/volumes?q=<b>(search)</b>+<b>(keyword)</b>:<b>(term_value)</b></i> </p>
+    <p> See <a href="https://developers.google.com/books/docs/v1/using?hl=en"> here </a> for more information (scroll down to "Performing a search") </p>
+    <p> e.g. search = decagon, keyword = isbn, term_value = 9781782276340 <br>
+      => https://www.googleapis.com/books/v1/volumes?q=<b>decagon</b>+<b>isbn</b>:<b>9781782276340</b> </p>
     @form(action = routes.ApplicationController.searchGoogleAndDisplay()) {
       @CSRF.formField
       <div>
         <input type="text" name="search" placeholder="search">
-        <input type="text" name="term" placeholder="term">
+        <select name="keyword" required>
+          <option value="" disabled selected>Select keyword</option>
+          <option value="intitle">intitle</option>
+          <option value="inauthor">inauthor</option>
+          <option value="inpublisher">inpublisher</option>
+          <option value="subject">subject</option>
+          <option value="isbn">isbn</option>
+          <option value="lccn">lccn</option>
+          <option value="oclc">oclc</option>
+        </select>
+        <input type="text" name="term_value" placeholder="term_value">
         <button type="submit">Search</button>
       </div>
     }

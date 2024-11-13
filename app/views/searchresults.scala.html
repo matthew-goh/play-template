@@ -1,4 +1,7 @@
-@(bookList: Seq[DataModel])
+@import helper._
+
+@*RequestHeader needed for form with CRSF*@
+@(bookList: Seq[DataModel])(implicit request: RequestHeader)
 @main("Search Books"){
   <h1>Google Books API Project</h1>
 
@@ -16,11 +19,13 @@
         <p>Description: @book.description</p>
         <p>Page count: @book.pageCount</p>
       </li>
-      <form action="@routes.ApplicationController.updateBook(book._id)" method="GET" class="button-form">
-        <button type="submit">Update</button>
-      </form>
-      <form action="@routes.ApplicationController.deleteBook(book._id)" method="GET" class="button-form">
-        <button type="submit">Delete</button>
+      <form action="@routes.ApplicationController.addFromSearch()" method="POST" class="button-form">
+        @CSRF.formField
+        <input type="hidden" name="_id" value="@book._id" required>
+        <input type="hidden" name="name" value="@book.name" required>
+        <input type="hidden" name="description" value="@book.description">
+        <input type="hidden" name="pageCount" value="@book.pageCount" required>
+        <button type="submit">Add to database</button>
       </form>
     }
     </ul>
