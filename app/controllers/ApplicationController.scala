@@ -66,11 +66,13 @@ class ApplicationController @Inject()(repoService: RepositoryService, service: L
     accessToken
     // Step 0: process submitted search
     val search: String = request.body.asFormUrlEncoded.flatMap(_.get("search").flatMap(_.headOption)).getOrElse("")
-    val term: String = request.body.asFormUrlEncoded.flatMap(_.get("term").flatMap(_.headOption)).getOrElse("")
+    val keyword: String = request.body.asFormUrlEncoded.flatMap(_.get("keyword").flatMap(_.headOption)).getOrElse("")
+    val termValue: String = request.body.asFormUrlEncoded.flatMap(_.get("term_value").flatMap(_.headOption)).getOrElse("")
 
-    if (search == "" && term == "") Future.successful(BadRequest(views.html.searchresults(Seq())))
+    if (keyword == "") Future.successful(BadRequest(views.html.searchresults(Seq())))
     else {
       // Step 1: get raw search results
+      val term = keyword + ":" + termValue
       service.getGoogleCollection(search = search, term = term).value.map {
         case Right(collection) => {
           // Step 2: convert to list of DataModels

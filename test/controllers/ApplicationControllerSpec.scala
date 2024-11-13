@@ -443,7 +443,8 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
 
       val searchRequest: FakeRequest[AnyContentAsFormUrlEncoded] = buildPost("/searchgoogle").withFormUrlEncodedBody(
         "search" -> "something",
-        "term" -> "inauthor:something"
+        "keyword" -> "inauthor",
+        "term_value" -> "something"
       ) // .withCRSFToken not needed?
       val searchResult: Future[Result] = TestApplicationController.searchGoogleAndDisplay()(searchRequest)
       status(searchResult) shouldBe Status.OK
@@ -466,7 +467,8 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
 
       val searchRequest: FakeRequest[AnyContentAsFormUrlEncoded] = buildPost("/searchgoogle").withFormUrlEncodedBody(
         "search" -> "something",
-        "term" -> "inauthor:something"
+        "keyword" -> "inauthor",
+        "term_value" -> "something"
       ) // .withCRSFToken not needed?
       val searchResult: Future[Result] = TestApplicationController.searchGoogleAndDisplay()(searchRequest)
       status(searchResult) shouldBe Status.OK
@@ -476,8 +478,9 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
 
     "show 'no books found' if search and term are both blank" in {
       val searchRequest: FakeRequest[AnyContentAsFormUrlEncoded] = buildPost("/searchgoogle").withFormUrlEncodedBody(
-        "search" -> "",
-        "term" -> ""
+        "search" -> "something",
+        "keyword" -> "",
+        "term_value" -> "something"
       ) // .withCRSFToken not needed?
       val searchResult: Future[Result] = TestApplicationController.searchGoogleAndDisplay()(searchRequest)
       status(searchResult) shouldBe Status.BAD_REQUEST
