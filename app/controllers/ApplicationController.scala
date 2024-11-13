@@ -68,8 +68,9 @@ class ApplicationController @Inject()(repoService: RepositoryService, service: L
     val search: String = request.body.asFormUrlEncoded.flatMap(_.get("search").flatMap(_.headOption)).getOrElse("")
     val keyword: String = request.body.asFormUrlEncoded.flatMap(_.get("keyword").flatMap(_.headOption)).getOrElse("")
     val termValue: String = request.body.asFormUrlEncoded.flatMap(_.get("term_value").flatMap(_.headOption)).getOrElse("")
+    val addToDatabase: String = request.body.asFormUrlEncoded.flatMap(_.get("add_to_database").flatMap(_.headOption)).getOrElse("false")
 
-    if (keyword == "") Future.successful(BadRequest(views.html.searchresults(Seq())))
+    if (keyword == "") Future.successful(BadRequest(views.html.searchresults(Seq(), addedToDatabase = false)))
     else {
       // Step 1: get raw search results
       val term = keyword + ":" + termValue
@@ -78,9 +79,9 @@ class ApplicationController @Inject()(repoService: RepositoryService, service: L
           // Step 2: convert to list of DataModels
           val bookList: Seq[DataModel] = service.extractBooksFromCollection(collection)
           // Step 3: add books to database (for ids not already there)
-//          bookList.map(book => repoService.create(book))
+          if (addToDatabase == "true") bookList.map(book => repoService.create(book))
           // Step 4: display the search results on a webpage
-          Ok(views.html.searchresults(bookList))
+          Ok(views.html.searchresults(bookList, addedToDatabase = addToDatabase == "true"))
         }
         //      case Left(error) => BadRequest {error.reason}
         case Left(error) => BadRequest(views.html.index())
