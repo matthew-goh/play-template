@@ -104,7 +104,7 @@
         <button type="submit">Search</button>
       </div>
     }
-    <br>
+    <br><br>
     <h3>Search Google Books API</h3>
 @*    <p> Books will be added to database </p>*@
     <p> Format is <i>https://www.googleapis.com/books/v1/volumes?q=<b>(search)</b>+<b>(keyword)</b>:<b>(term_value)</b></i> </p>
@@ -127,6 +127,10 @@
         </select>
         <input type="text" name="term_value" placeholder="term_value">
         <button type="submit">Search</button>
+      </div>
+      <div>
+        @*If the checkbox is checked, the server will receive add_to_database=true. If not, the add_to_database field will not be included in the form data*@
+        <input type="checkbox" name="add_to_database" value="true"> Add search results to database?
       </div>
     }
   </div>
