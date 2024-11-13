@@ -19,7 +19,7 @@ class ApplicationController @Inject()(repoService: RepositoryService, service: L
 
   def listAllBooks(): Action[AnyContent] = Action.async {implicit request =>
     repoService.index().map{ // dataRepository.index() is a Future[Either[APIError.BadAPIResponse, Seq[DataModel]]]
-      case Right(bookList: Seq[DataModel]) => Ok(views.html.searchresults(bookList))
+      case Right(bookList: Seq[DataModel]) => Ok(views.html.listing(bookList))
       case Left(error) => Status(error.httpResponseStatus)(error.reason)
     }
   }
@@ -42,7 +42,7 @@ class ApplicationController @Inject()(repoService: RepositoryService, service: L
       case Some(id) => {
         repoService.read(id).map{
           case Right(item) => Ok(views.html.bookdetails(item))
-          case Left(error) => BadRequest(views.html.bookdetails(badBook))
+          case Left(error) => NotFound(views.html.bookdetails(badBook))
         }
       }
       case None => Future.successful(BadRequest(views.html.index()))
@@ -54,28 +54,19 @@ class ApplicationController @Inject()(repoService: RepositoryService, service: L
     titleToSearch match {
       case Some(title) => {
         repoService.readBySpecifiedField("name", title).map{
-          case Right(books) => Ok(views.html.searchresults(books))
-          case Left(error) => BadRequest(views.html.searchresults(Seq()))
+          case Right(books) => Ok(views.html.listing(books))
+          case Left(error) => BadRequest(views.html.listing(Seq()))
         }
       }
-      case None => Future.successful(BadRequest(views.html.searchresults(Seq())))
+      case None => Future.successful(BadRequest(views.html.listing(Seq())))
     }
   }
 
   def searchGoogleAndDisplay(): Action[AnyContent] = Action.async { implicit request =>
     accessToken
     // Step 0: process submitted search
-    val searchSubmit: Option[String] = request.body.asFormUrlEncoded.flatMap(_.get("search").flatMap(_.headOption))
-    val termSubmit: Option[String] = request.body.asFormUrlEncoded.flatMap(_.get("term").flatMap(_.headOption))
-
-    val search = searchSubmit match {
-      case Some(text) => text
-      case None => ""
-    }
-    val term = termSubmit match {
-      case Some(text) => text
-      case None => ""
-    }
+    val search: String = request.body.asFormUrlEncoded.flatMap(_.get("search").flatMap(_.headOption)).getOrElse("")
+    val term: String = request.body.asFormUrlEncoded.flatMap(_.get("term").flatMap(_.headOption)).getOrElse("")
 
     if (search == "" && term == "") Future.successful(BadRequest(views.html.searchresults(Seq())))
     else {
@@ -85,12 +76,31 @@ class ApplicationController @Inject()(repoService: RepositoryService, service: L
           // Step 2: convert to list of DataModels
           val bookList: Seq[DataModel] = service.extractBooksFromCollection(collection)
           // Step 3: add books to database (for ids not already there)
-          bookList.map(book => repoService.create(book))
+//          bookList.map(book => repoService.create(book))
           // Step 4: display the search results on a webpage
           Ok(views.html.searchresults(bookList))
         }
         //      case Left(error) => BadRequest {error.reason}
         case Left(error) => BadRequest(views.html.index())
+      }
+    }
+  }
+  def addFromSearch(): Action[AnyContent] = Action.async {implicit request =>
+    accessToken
+    val id: String = request.body.asFormUrlEncoded.flatMap(_.get("_id").flatMap(_.headOption)).getOrElse("")
+    val name: String = request.body.asFormUrlEncoded.flatMap(_.get("name").flatMap(_.headOption)).getOrElse("")
+    val description: String = request.body.asFormUrlEncoded.flatMap(_.get("description").flatMap(_.headOption)).getOrElse("")
+    val pageCount: Int = request.body.asFormUrlEncoded.flatMap(_.get("pageCount").flatMap(_.headOption)).getOrElse("0").toInt
+
+    val book = DataModel(id, name, description, pageCount)
+    repoService.create(book).map{
+      case Right(_) => Ok(views.html.bookdetails(book))
+      case Left(error) => {
+        error.reason match {
+          case "Bad response from upstream; got status: 500, and got reason: Book already exists in database"
+          => BadRequest(views.html.unsuccessful("Book ID already exists in database"))
+          case _ => BadRequest("Unable to add book.")
+        }
       }
     }
   }
