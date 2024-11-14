@@ -118,10 +118,9 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
       afterEach()
     }
 
-    "return a BadRequest if the book could not be found" in {
+    "return a NotFound if the book could not be found" in {
       beforeEach()
       val readResult: Future[Result] = TestApplicationController.read("aaaa")(FakeRequest())
-      Thread.sleep(200)
       status(readResult) shouldBe NOT_FOUND
       contentAsString(readResult) shouldBe "Bad response from upstream; got status: 404, and got reason: Book not found"
       afterEach()
@@ -145,6 +144,7 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
       val request: FakeRequest[JsValue] = buildGet("/api/${dataModel._id}").withBody[JsValue](Json.toJson(dataModel))
       val createdResult: Future[Result] = TestApplicationController.create()(request)
 
+      Thread.sleep(100)
       val readResult: Future[Result] = TestApplicationController.readBySpecifiedField("name", "Test Name")(FakeRequest())
       status(readResult) shouldBe Status.OK
       contentAsJson(readResult).as[Seq[DataModel]] shouldBe Seq(dataModel)
@@ -156,6 +156,7 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
       val request: FakeRequest[JsValue] = buildGet("/api/${dataModel._id}").withBody[JsValue](Json.toJson(dataModel))
       val createdResult: Future[Result] = TestApplicationController.create()(request)
 
+      Thread.sleep(100)
       val readResult: Future[Result] = TestApplicationController.readBySpecifiedField("description", "test DESCRIPTION")(FakeRequest())
       status(readResult) shouldBe Status.OK
       contentAsJson(readResult).as[Seq[DataModel]] shouldBe Seq(dataModel)
@@ -197,7 +198,7 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
       afterEach()
     }
 
-    "creates the book in the database if it could not be found" in { // upsert(true)
+    "add the book to the database if it could not be found" in { // upsert(true)
       beforeEach()
       val updateRequest: FakeRequest[JsValue] = buildPost("/api/${dataModel._id}").withBody[JsValue](Json.toJson(newDataModel))
       val updateResult = TestApplicationController.update("abcd")(updateRequest) // Future(<not completed>)
@@ -638,7 +639,7 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
   }
 
   "ApplicationController .deleteBook()" should {
-    "delete a book in the database" in {
+    "delete a book from the database" in {
       beforeEach()
       val request: FakeRequest[JsValue] = buildPost("/api").withBody[JsValue](Json.toJson(dataModel))
       val createdResult: Future[Result] = TestApplicationController.create()(request)
