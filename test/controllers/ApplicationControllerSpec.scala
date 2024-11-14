@@ -118,10 +118,9 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
       afterEach()
     }
 
-    "return a BadRequest if the book could not be found" in {
+    "return a NotFound if the book could not be found" in {
       beforeEach()
       val readResult: Future[Result] = TestApplicationController.read("aaaa")(FakeRequest())
-      Thread.sleep(200)
       status(readResult) shouldBe NOT_FOUND
       contentAsString(readResult) shouldBe "Bad response from upstream; got status: 404, and got reason: Book not found"
       afterEach()
@@ -145,6 +144,7 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
       val request: FakeRequest[JsValue] = buildGet("/api/${dataModel._id}").withBody[JsValue](Json.toJson(dataModel))
       val createdResult: Future[Result] = TestApplicationController.create()(request)
 
+      Thread.sleep(100)
       val readResult: Future[Result] = TestApplicationController.readBySpecifiedField("name", "Test Name")(FakeRequest())
       status(readResult) shouldBe Status.OK
       contentAsJson(readResult).as[Seq[DataModel]] shouldBe Seq(dataModel)
@@ -156,6 +156,7 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
       val request: FakeRequest[JsValue] = buildGet("/api/${dataModel._id}").withBody[JsValue](Json.toJson(dataModel))
       val createdResult: Future[Result] = TestApplicationController.create()(request)
 
+      Thread.sleep(100)
       val readResult: Future[Result] = TestApplicationController.readBySpecifiedField("description", "test DESCRIPTION")(FakeRequest())
       status(readResult) shouldBe Status.OK
       contentAsJson(readResult).as[Seq[DataModel]] shouldBe Seq(dataModel)
@@ -197,7 +198,7 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
       afterEach()
     }
 
-    "creates the book in the database if it could not be found" in { // upsert(true)
+    "add the book to the database if it could not be found" in { // upsert(true)
       beforeEach()
       val updateRequest: FakeRequest[JsValue] = buildPost("/api/${dataModel._id}").withBody[JsValue](Json.toJson(newDataModel))
       val updateResult = TestApplicationController.update("abcd")(updateRequest) // Future(<not completed>)
@@ -312,7 +313,6 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
         .once()
 
       val collectionResult: Future[Result] = TestApplicationController.getGoogleCollection(search = "", term = "")(FakeRequest())
-      println(collectionResult)
       status(collectionResult) shouldBe OK
       contentAsJson(collectionResult) shouldBe LibraryServiceSpec.testAPIResult
     }
@@ -429,7 +429,7 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
   }
 
   "ApplicationController .searchGoogleAndDisplay()" should {
-    "list the API search results" in {
+    "list the API search results without adding books to the database" in {
       beforeEach()
       (mockLibraryService.getGoogleCollection(_: Option[String], _: String, _: String)(_: ExecutionContext))
         .expects(None, *, *, *)
@@ -450,6 +450,42 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
       status(searchResult) shouldBe Status.OK
       contentAsString(searchResult) should include ("test description")
       contentAsString(searchResult) should include ("The Decagon House Murders")
+      contentAsString(searchResult) should include ("Add to database")
+
+      val indexResult: Future[Result] = TestApplicationController.index()(FakeRequest())
+      status(indexResult) shouldBe Status.OK
+      contentAsJson(indexResult).as[Seq[DataModel]] shouldBe Seq() // database should be empty
+      afterEach()
+    }
+
+    "list the API search results and add the books to the database" in {
+      beforeEach()
+      (mockLibraryService.getGoogleCollection(_: Option[String], _: String, _: String)(_: ExecutionContext))
+        .expects(None, *, *, *)
+        .returning(EitherT.rightT(LibraryServiceSpec.testAPIResult.as[Collection]))
+        .once()
+
+      (mockLibraryService.extractBooksFromCollection(_: Collection))
+        .expects(*)
+        .returning(Seq(dataModel, dataModel2))
+        .once()
+
+      val searchRequest: FakeRequest[AnyContentAsFormUrlEncoded] = buildPost("/searchgoogle").withFormUrlEncodedBody(
+        "search" -> "something",
+        "keyword" -> "inauthor",
+        "term_value" -> "something",
+        "add_to_database" -> "true"
+      ) // .withCRSFToken not needed?
+      val searchResult: Future[Result] = TestApplicationController.searchGoogleAndDisplay()(searchRequest)
+      status(searchResult) shouldBe Status.OK
+      contentAsString(searchResult) should include ("test description")
+      contentAsString(searchResult) should include ("The Decagon House Murders")
+      contentAsString(searchResult) shouldNot include ("Add to database")
+
+      Thread.sleep(100) // allow time to add books to database
+      val indexResult: Future[Result] = TestApplicationController.index()(FakeRequest())
+      status(indexResult) shouldBe Status.OK
+      contentAsJson(indexResult).as[Seq[DataModel]] shouldBe Seq(dataModel, dataModel2) // database should contain the 2 books
       afterEach()
     }
 
@@ -476,7 +512,7 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
       afterEach()
     }
 
-    "show 'no books found' if search and term are both blank" in {
+    "show 'no books found' if keyword is blank" in {
       val searchRequest: FakeRequest[AnyContentAsFormUrlEncoded] = buildPost("/searchgoogle").withFormUrlEncodedBody(
         "search" -> "something",
         "keyword" -> "",
@@ -603,7 +639,7 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
   }
 
   "ApplicationController .deleteBook()" should {
-    "delete a book in the database" in {
+    "delete a book from the database" in {
       beforeEach()
       val request: FakeRequest[JsValue] = buildPost("/api").withBody[JsValue](Json.toJson(dataModel))
       val createdResult: Future[Result] = TestApplicationController.create()(request)
