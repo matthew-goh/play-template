@@ -3,7 +3,7 @@ package services
 import baseSpec.BaseSpec
 import cats.data.EitherT
 import connectors.LibraryConnector
-import models.{APIError, Book, Collection, DataModel}
+import models.{APIError, Book, Collection, DataModel, VolumeInfo}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatestplus.play.guice.GuiceOneAppPerSuite
@@ -36,7 +36,7 @@ class LibraryServiceSpec extends BaseSpec with MockFactory with ScalaFutures wit
 
       // allows for the result to be waited for as the Future type can be seen as a placeholder for a value we don't have yet
       whenReady(testService.getGoogleCollection(urlOverride = Some(url), search = "", term = "").value) { result =>
-        result shouldBe Right(Collection("books#volumes", 1, Some(LibraryServiceSpec.testAPIItems)))
+        result shouldBe Right(LibraryServiceSpec.testAPICollection)
       }
     }
 
@@ -152,11 +152,12 @@ object LibraryServiceSpec {
   }""")
 
   val testAPIItems: JsValue = (testAPIResult \ "items").get
-  val testAPIVolumeInfo: JsValue = (testAPIItems(0) \ "volumeInfo").get
-  val testAPIVolumeInfoNoDesc: JsValue = Json.parse(
-    """{"title": "The Decagon House Murders", "authors": ["Yukito Ayatsuji"], "publisher": "Pushkin Vertigo", "publishedDate": "2021-05-25", "pageCount": 289}""".stripMargin)
+  val testAPIVolumeInfo: VolumeInfo = (testAPIItems(0) \ "volumeInfo").get.as[VolumeInfo]
+//  val testAPIVolumeInfoNoDesc: JsValue = Json.parse(
+//    """{"title": "The Decagon House Murders", "authors": ["Yukito Ayatsuji"], "publisher": "Pushkin Vertigo", "publishedDate": "2021-05-25", "pageCount": 289}""".stripMargin)
+val testAPIVolumeInfoNoDesc: VolumeInfo = VolumeInfo("The Decagon House Murders", None, 289)
 
-  val testAPICollection: Collection = Collection("books#volumes", 1, Some(testAPIItems))
+  val testAPICollection: Collection = Collection("books#volumes", 1, Some(testAPIItems.as[Seq[Book]]))
   val testAPIBook: Book = Book("1GIrEAAAQBAJ", testAPIVolumeInfo)
   val testAPIBookNoDesc: Book = Book("1GIrEAAAQBAJ", testAPIVolumeInfoNoDesc)
   val testAPIDataModel: DataModel = DataModel("1GIrEAAAQBAJ", "The Decagon House Murders",

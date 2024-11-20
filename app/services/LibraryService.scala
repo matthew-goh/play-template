@@ -23,21 +23,14 @@ class LibraryService @Inject()(connector: LibraryConnector) {
 
   def extractBooksFromCollection(collection: Collection): Seq[DataModel] = {
     collection.items match {
-      case Some(itemsJson) =>{
-        itemsJson.as[Seq[JsValue]].map {
-          bookJson => convertBookToDataModel(bookJson.as[Book])
-        }
-      }
+      case Some(bookList) => bookList.map { book => convertBookToDataModel(book) }
       case None => Seq()
     }
   }
 
   def convertBookToDataModel(book: Book): DataModel = {
-    val volInfo = book.volumeInfo.as[VolumeInfo]
-    val bookDescription = volInfo.description match {
-      case Some(desc) => desc
-      case None => ""
-    }
+    val volInfo = book.volumeInfo
+    val bookDescription = volInfo.description.getOrElse("")
     DataModel(_id = book.id, name = volInfo.title, description = bookDescription, pageCount = volInfo.pageCount)
   }
 }

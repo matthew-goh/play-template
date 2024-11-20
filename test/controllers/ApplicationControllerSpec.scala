@@ -7,8 +7,6 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatestplus.play.guice.GuiceOneAppPerSuite
 import services.LibraryServiceSpec
 import org.scalatest.concurrent.ScalaFutures
-import play.filters.csrf.CSRF
-import play.api.test.CSRFTokenHelper._
 import play.api.test.FakeRequest
 import play.api.http.Status
 import play.api.libs.json._
@@ -314,7 +312,7 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
 
       val collectionResult: Future[Result] = TestApplicationController.getGoogleCollection(search = "", term = "")(FakeRequest())
       status(collectionResult) shouldBe OK
-      contentAsJson(collectionResult) shouldBe LibraryServiceSpec.testAPIResult
+      contentAsJson(collectionResult) shouldBe Json.toJson(LibraryServiceSpec.testAPICollection)
     }
   }
 
@@ -432,12 +430,12 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
     "list the API search results without adding books to the database" in {
       beforeEach()
       (mockLibraryService.getGoogleCollection(_: Option[String], _: String, _: String)(_: ExecutionContext))
-        .expects(None, *, *, *)
+        .expects(None, "something", "inauthor:something", *)
         .returning(EitherT.rightT(LibraryServiceSpec.testAPIResult.as[Collection]))
         .once()
 
       (mockLibraryService.extractBooksFromCollection(_: Collection))
-        .expects(*)
+        .expects(LibraryServiceSpec.testAPICollection)
         .returning(Seq(dataModel, dataModel2))
         .once()
 
@@ -461,12 +459,12 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
     "list the API search results and add the books to the database" in {
       beforeEach()
       (mockLibraryService.getGoogleCollection(_: Option[String], _: String, _: String)(_: ExecutionContext))
-        .expects(None, *, *, *)
+        .expects(None, "something", "inauthor:something", *)
         .returning(EitherT.rightT(LibraryServiceSpec.testAPIResult.as[Collection]))
         .once()
 
       (mockLibraryService.extractBooksFromCollection(_: Collection))
-        .expects(*)
+        .expects(LibraryServiceSpec.testAPICollection)
         .returning(Seq(dataModel, dataModel2))
         .once()
 
@@ -492,7 +490,7 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
     "show 'no books found' if there are no search results" in {
       beforeEach()
       (mockLibraryService.getGoogleCollection(_: Option[String], _: String, _: String)(_: ExecutionContext))
-        .expects(None, *, *, *)
+        .expects(None, "something", "inauthor:something", *)
         .returning(EitherT.rightT(LibraryServiceSpec.testAPIResult.as[Collection]))
         .once()
 
