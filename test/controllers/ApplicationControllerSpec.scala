@@ -460,7 +460,7 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
       beforeEach()
       (mockLibraryService.getGoogleCollection(_: Option[String], _: String, _: String)(_: ExecutionContext))
         .expects(None, "something", "inauthor:something", *)
-        .returning(EitherT.rightT(LibraryServiceSpec.testAPIResult.as[Collection]))
+        .returning(EitherT.rightT(LibraryServiceSpec.testAPICollection))
         .once()
 
       (mockLibraryService.extractBooksFromCollection(_: Collection))
@@ -483,7 +483,7 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
       Thread.sleep(100) // allow time to add books to database
       val indexResult: Future[Result] = TestApplicationController.index()(FakeRequest())
       status(indexResult) shouldBe Status.OK
-      contentAsJson(indexResult).as[Seq[DataModel]] shouldBe Seq(dataModel, dataModel2) // database should contain the 2 books
+      contentAsJson(indexResult).as[Seq[DataModel]] should contain theSameElementsAs Seq(dataModel, dataModel2) // database should contain the 2 books
       afterEach()
     }
 

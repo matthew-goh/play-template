@@ -151,15 +151,15 @@ object LibraryServiceSpec {
     ]
   }""")
 
-  val testAPIItems: JsValue = (testAPIResult \ "items").get
-  val testAPIVolumeInfo: VolumeInfo = (testAPIItems(0) \ "volumeInfo").get.as[VolumeInfo]
-//  val testAPIVolumeInfoNoDesc: JsValue = Json.parse(
-//    """{"title": "The Decagon House Murders", "authors": ["Yukito Ayatsuji"], "publisher": "Pushkin Vertigo", "publishedDate": "2021-05-25", "pageCount": 289}""".stripMargin)
-val testAPIVolumeInfoNoDesc: VolumeInfo = VolumeInfo("The Decagon House Murders", None, 289)
+  val testAPIVolumeInfo: VolumeInfo = VolumeInfo("The Decagon House Murders", Some("\"Ayatsuji's brilliant and richly atmospheric puzzle will appeal to fans of golden age whodunits...\""), 289)
+  val testAPIVolumeInfoNoDesc: VolumeInfo = VolumeInfo("The Decagon House Murders", None, 289)
 
-  val testAPICollection: Collection = Collection("books#volumes", 1, Some(testAPIItems.as[Seq[Book]]))
   val testAPIBook: Book = Book("1GIrEAAAQBAJ", testAPIVolumeInfo)
   val testAPIBookNoDesc: Book = Book("1GIrEAAAQBAJ", testAPIVolumeInfoNoDesc)
+
+  val testAPIItems: Seq[Book] = Seq(testAPIBook)
+  val testAPICollection: Collection = Collection("books#volumes", 1, Some(testAPIItems))
+
   val testAPIDataModel: DataModel = DataModel("1GIrEAAAQBAJ", "The Decagon House Murders",
     "\"Ayatsuji's brilliant and richly atmospheric puzzle will appeal to fans of golden age whodunits...\"", 289)
   val testAPIDataModelNoDesc: DataModel = DataModel("1GIrEAAAQBAJ", "The Decagon House Murders", "", 289)
