@@ -8,13 +8,14 @@ import org.scalatestplus.play.guice.GuiceOneAppPerSuite
 import services.LibraryServiceSpec
 import org.scalatest.concurrent.ScalaFutures
 import play.api.test.FakeRequest
-import play.api.http.Status
+import play.api.http.{HttpEntity, Status}
 import play.api.libs.json._
 import play.api.mvc._
 import play.api.test.Helpers._
 import services.LibraryService
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.{Await, ExecutionContext, Future}
+import scala.concurrent.duration._
 
 class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory {
   val mockLibraryService: LibraryService = mock[LibraryService]
@@ -73,6 +74,16 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
     "create a book in the database" in {
       beforeEach()
       val request: FakeRequest[JsValue] = buildPost("/api").withBody[JsValue](Json.toJson(dataModel))
+
+//      val createdResultAwait: Result = Await.result(TestApplicationController.create()(request), 100.milliseconds)
+//      createdResultAwait.header.status shouldBe Status.CREATED
+//      // Extract the response body from the Result
+//      val responseBody: String = createdResultAwait.body match {
+//        case HttpEntity.Strict(data, _) => data.decodeString("UTF-8")
+//        case _                          => throw new IllegalStateException("Unexpected response entity type")
+//      }
+//      // Parse the response body as JSON and cast to DataModel
+//      Json.parse(responseBody).as[DataModel] shouldBe dataModel
 
       val createdResult: Future[Result] = TestApplicationController.create()(request)
       status(createdResult) shouldBe Status.CREATED
@@ -271,6 +282,7 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
 
       val deleteResult: Future[Result] = TestApplicationController.delete("abcd")(FakeRequest())
       status(deleteResult) shouldBe Status.ACCEPTED
+      contentAsString(deleteResult) shouldBe "Book abcd has been deleted"
 
       // check that database is now empty
       val indexResult: Future[Result] = TestApplicationController.index()(FakeRequest())
@@ -370,16 +382,13 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
     }
   }
 
-  "ApplicationController .searchBookByID()" should {
-    "retrieve the specified book's details" in {
+  "ApplicationController .showBookDetails()" should {
+    "display the specified book's details" in {
       beforeEach()
       val request: FakeRequest[JsValue] = buildPost("/api").withBody[JsValue](Json.toJson(dataModel))
       val createdResult: Future[Result] = TestApplicationController.create()(request)
 
-      val searchRequest: FakeRequest[AnyContentAsFormUrlEncoded] = buildPost("/searchid").withFormUrlEncodedBody(
-        "bookID" -> "abcd"
-      ) // .withCRSFToken not needed?
-      val searchResult: Future[Result] = TestApplicationController.searchBookByID()(searchRequest)
+      val searchResult: Future[Result] = TestApplicationController.showBookDetails("abcd")(FakeRequest())
       status(searchResult) shouldBe Status.OK
       contentAsString(searchResult) should include ("test name")
       afterEach()
@@ -387,13 +396,21 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
 
     "return a NotFound if the book is not in the database" in {
       beforeEach()
-      val searchRequest: FakeRequest[AnyContentAsFormUrlEncoded] = buildPost("/searchid").withFormUrlEncodedBody(
-        "bookID" -> "abcd"
-      ) // .withCRSFToken not needed?
-      val searchResult: Future[Result] = TestApplicationController.searchBookByID()(searchRequest)
+      val searchResult: Future[Result] = TestApplicationController.showBookDetails("abcd")(FakeRequest())
       status(searchResult) shouldBe Status.NOT_FOUND
       contentAsString(searchResult) should include ("Not found")
       afterEach()
+    }
+  }
+
+  "ApplicationController .searchBookByID()" should {
+    "redirect to book details page when an id is searched" in {
+      val searchRequest: FakeRequest[AnyContentAsFormUrlEncoded] = buildPost("/searchid").withFormUrlEncodedBody(
+        "bookID" -> "abcd"
+      )
+      val searchResult: Future[Result] = TestApplicationController.searchBookByID()(searchRequest)
+      status(searchResult) shouldBe Status.SEE_OTHER
+      redirectLocation(searchResult) shouldBe Some("/bookdetails/abcd")
     }
   }
 

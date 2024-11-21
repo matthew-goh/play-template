@@ -27,27 +27,19 @@ class ApplicationController @Inject()(repoService: RepositoryService, service: L
   //    val numBooks = bookList.length
   //    val numPages = (numBooks / itemsPerPage) + (if (numBooks % itemsPerPage > 0) 1 else 0)
 
-//  def showBookDetails(id: String): Action[AnyContent] = Action.async {implicit request =>
-//    val badBook = DataModel("Not found", "N/A", "N/A", 0)
-//    repoService.read(id).map{
-//      case Right(item) => Ok(views.html.bookdetails(item))
-//      case Left(error) => BadRequest(views.html.bookdetails(badBook))
-//    }
-//  }
-  def searchBookByID(): Action[AnyContent] = Action.async {implicit request =>
-    accessToken
+  def showBookDetails(id: String): Action[AnyContent] = Action.async {implicit request =>
     val badBook = DataModel("Not found", "N/A", "N/A", 0)
-    val idToSearch: Option[String] = request.body.asFormUrlEncoded.flatMap(_.get("bookID").flatMap(_.headOption))
-    idToSearch match {
-      case Some(id) => {
-        repoService.read(id).map{
-          case Right(item) => Ok(views.html.bookdetails(item))
-          case Left(error) => NotFound(views.html.bookdetails(badBook))
-        }
-      }
-      case None => Future.successful(BadRequest(views.html.index()))
+    repoService.read(id).map{
+      case Right(book) => Ok(views.html.bookdetails(book))
+      case Left(error) => NotFound(views.html.bookdetails(badBook))
     }
   }
+  def searchBookByID(): Action[AnyContent] = Action.async {implicit request =>
+    accessToken
+    val idToSearch: String = request.body.asFormUrlEncoded.flatMap(_.get("bookID").flatMap(_.headOption)).get
+    Future.successful(Redirect(routes.ApplicationController.showBookDetails(idToSearch)))
+  }
+
   def searchBookByTitle(): Action[AnyContent] = Action.async {implicit request =>
     accessToken
     val titleToSearch: Option[String] = request.body.asFormUrlEncoded.flatMap(_.get("title").flatMap(_.headOption))
@@ -232,30 +224,20 @@ class ApplicationController @Inject()(repoService: RepositoryService, service: L
 
   def delete(id: String): Action[AnyContent] = Action.async { implicit request =>
     repoService.delete(id).map{
-      case Right(_) => Accepted
+      case Right(_) => Accepted {s"Book $id has been deleted"}
       case Left(error) => BadRequest {error.reason}
     } // dataRepository.delete() is a Future[Either[APIError, result.DeleteResult]]
   }
 
-//  def getGoogleBook(search: String, term: String): Action[AnyContent] = Action.async { implicit request =>
-//    service.getGoogleBook(search = search, term = term).value.map {
-//      case Right(book) => Ok {Json.toJson(book)}
-//      case Left(error) => Status(error.httpResponseStatus)(error.reason)
-//    }
-//  }
   def getGoogleCollection(search: String, term: String): Action[AnyContent] = Action.async { implicit request =>
     service.getGoogleCollection(search = search, term = term).value.map {
-      case Right(collection) => {
-        Ok {Json.toJson(collection)}
-      }
+      case Right(collection) => Ok {Json.toJson(collection)}
       case Left(error) => BadRequest {error.reason}
     }
   }
   def getGoogleBookList(search: String, term: String): Action[AnyContent] = Action.async { implicit request =>
     service.getGoogleCollection(search = search, term = term).value.map {
-      case Right(collection) => {
-        Ok {Json.toJson(service.extractBooksFromCollection(collection))}
-      }
+      case Right(collection) => Ok {Json.toJson(service.extractBooksFromCollection(collection))}
       case Left(error) => BadRequest {error.reason}
     }
   }
