@@ -41,8 +41,6 @@ class LibraryServiceSpec extends BaseSpec with MockFactory with ScalaFutures wit
     }
 
     "return an error" in {
-      val url: String = "testUrl"
-
       (mockConnector.get[Book](_: String)(_: OFormat[Book], _: ExecutionContext))
         .expects(url, *, *)
         .returning(EitherT.leftT(APIError.BadAPIResponse(500, "Could not connect")))// How do we return an error?
@@ -50,6 +48,56 @@ class LibraryServiceSpec extends BaseSpec with MockFactory with ScalaFutures wit
 
       whenReady(testService.getGoogleCollection(urlOverride = Some(url), search = "", term = "").value) { result =>
         result shouldBe Left(APIError.BadAPIResponse(500, "Could not connect"))
+      }
+    }
+  }
+
+  "getGoogleCollection (version called by ApplicationController searchGoogleAndDisplay())" should {
+    "return a Collection" in {
+      val reqBody = Some(Map(
+        "search" -> List("something"),
+        "keyword" -> List("inauthor"),
+        "term_value" -> List("something")
+      ))
+      val url = "https://www.googleapis.com/books/v1/volumes?q=something%inauthor:something"
+
+      (mockConnector.get[Collection](_: String)(_: OFormat[Collection], _: ExecutionContext))
+        .expects(url, *, *)
+        .returning(EitherT.rightT(LibraryServiceSpec.testAPIResult.as[Collection]))
+        .once()
+
+      whenReady(testService.getGoogleCollection(reqBody = reqBody).value) { result =>
+        result shouldBe Right(LibraryServiceSpec.testAPICollection)
+      }
+    }
+
+    "return an error from the connector" in {
+      val reqBody = Some(Map(
+        "search" -> List("something"),
+        "keyword" -> List("inauthor"),
+        "term_value" -> List("something")
+      ))
+      val url = "https://www.googleapis.com/books/v1/volumes?q=something%inauthor:something"
+
+      (mockConnector.get[Collection](_: String)(_: OFormat[Collection], _: ExecutionContext))
+        .expects(url, *, *)
+        .returning(EitherT.leftT(APIError.BadAPIResponse(500, "Could not connect")))
+        .once()
+
+      whenReady(testService.getGoogleCollection(reqBody = reqBody).value) { result =>
+        result shouldBe Left(APIError.BadAPIResponse(500, "Could not connect"))
+      }
+    }
+
+    "return an error if keyword is blank" in {
+      val reqBody = Some(Map(
+        "search" -> List("something"),
+        "keyword" -> List(""),
+        "term_value" -> List("something")
+      ))
+
+      whenReady(testService.getGoogleCollection(reqBody = reqBody).value) { result =>
+        result shouldBe Left(APIError.BadAPIResponse(400, "Keyword missing from search"))
       }
     }
   }

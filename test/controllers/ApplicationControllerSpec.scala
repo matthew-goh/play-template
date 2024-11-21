@@ -429,9 +429,15 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
   "ApplicationController .searchGoogleAndDisplay()" should {
     "list the API search results without adding books to the database" in {
       beforeEach()
-      (mockLibraryService.getGoogleCollection(_: Option[String], _: String, _: String)(_: ExecutionContext))
-        .expects(None, "something", "inauthor:something", *)
-        .returning(EitherT.rightT(LibraryServiceSpec.testAPIResult.as[Collection]))
+      val reqBody = Some(Map(
+        "search" -> List("something"),
+        "keyword" -> List("inauthor"),
+        "term_value" -> List("something")
+      ))
+
+      (mockLibraryService.getGoogleCollection(_: Option[Map[String, Seq[String]]])(_: ExecutionContext))
+        .expects(reqBody, *)
+        .returning(EitherT.rightT(LibraryServiceSpec.testAPICollection))
         .once()
 
       (mockLibraryService.extractBooksFromCollection(_: Collection))
@@ -458,8 +464,15 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
 
     "list the API search results and add the books to the database" in {
       beforeEach()
-      (mockLibraryService.getGoogleCollection(_: Option[String], _: String, _: String)(_: ExecutionContext))
-        .expects(None, "something", "inauthor:something", *)
+      val reqBody = Some(Map(
+        "search" -> List("something"),
+        "keyword" -> List("inauthor"),
+        "term_value" -> List("something"),
+        "add_to_database" -> List("true")
+      ))
+
+      (mockLibraryService.getGoogleCollection(_: Option[Map[String, Seq[String]]])(_: ExecutionContext))
+        .expects(reqBody, *)
         .returning(EitherT.rightT(LibraryServiceSpec.testAPICollection))
         .once()
 
@@ -489,9 +502,15 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
 
     "show 'no books found' if there are no search results" in {
       beforeEach()
-      (mockLibraryService.getGoogleCollection(_: Option[String], _: String, _: String)(_: ExecutionContext))
-        .expects(None, "something", "inauthor:something", *)
-        .returning(EitherT.rightT(LibraryServiceSpec.testAPIResult.as[Collection]))
+      val reqBody = Some(Map(
+        "search" -> List("something"),
+        "keyword" -> List("inauthor"),
+        "term_value" -> List("something")
+      ))
+
+      (mockLibraryService.getGoogleCollection(_: Option[Map[String, Seq[String]]])(_: ExecutionContext))
+        .expects(reqBody, *)
+        .returning(EitherT.rightT(LibraryServiceSpec.testAPICollection))
         .once()
 
       (mockLibraryService.extractBooksFromCollection(_: Collection))
@@ -510,7 +529,18 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
       afterEach()
     }
 
-    "show 'no books found' if keyword is blank" in {
+    "return a BadRequest if keyword is blank" in {
+      val reqBody = Some(Map(
+        "search" -> List("something"),
+        "keyword" -> List(""),
+        "term_value" -> List("something")
+      ))
+
+      (mockLibraryService.getGoogleCollection(_: Option[Map[String, Seq[String]]])(_: ExecutionContext))
+        .expects(reqBody, *)
+        .returning(EitherT.leftT(APIError.BadAPIResponse(400, "Keyword missing from search")))
+        .once()
+
       val searchRequest: FakeRequest[AnyContentAsFormUrlEncoded] = buildPost("/searchgoogle").withFormUrlEncodedBody(
         "search" -> "something",
         "keyword" -> "",
@@ -518,7 +548,7 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
       ) // .withCRSFToken not needed?
       val searchResult: Future[Result] = TestApplicationController.searchGoogleAndDisplay()(searchRequest)
       status(searchResult) shouldBe Status.BAD_REQUEST
-      contentAsString(searchResult) should include ("No books found")
+      contentAsString(searchResult) should include ("Keyword missing from search")
     }
   }
 

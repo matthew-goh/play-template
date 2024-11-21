@@ -64,40 +64,49 @@ class ApplicationController @Inject()(repoService: RepositoryService, service: L
 
   def searchGoogleAndDisplay(): Action[AnyContent] = Action.async { implicit request =>
     accessToken
-    // Step 0: process submitted search
-    val search: String = request.body.asFormUrlEncoded.flatMap(_.get("search").flatMap(_.headOption)).getOrElse("")
-    val keyword: String = request.body.asFormUrlEncoded.flatMap(_.get("keyword").flatMap(_.headOption)).getOrElse("")
-    val termValue: String = request.body.asFormUrlEncoded.flatMap(_.get("term_value").flatMap(_.headOption)).getOrElse("")
     val addToDatabase: String = request.body.asFormUrlEncoded.flatMap(_.get("add_to_database").flatMap(_.headOption)).getOrElse("false")
-
-    if (keyword == "") Future.successful(BadRequest(views.html.searchresults(Seq(), addedToDatabase = false)))
-    else {
-      // Step 1: get raw search results
-      val term = keyword + ":" + termValue
-      service.getGoogleCollection(search = search, term = term).value.map {
-        case Right(collection) => {
-          // Step 2: convert to list of DataModels
-          val bookList: Seq[DataModel] = service.extractBooksFromCollection(collection)
-          // Step 3: add books to database (for ids not already there)
-          if (addToDatabase == "true") bookList.map(book => repoService.create(book))
-          // Step 4: display the search results on a webpage
-          Ok(views.html.searchresults(bookList, addedToDatabase = addToDatabase == "true"))
-        }
-        //      case Left(error) => BadRequest {error.reason}
-        case Left(error) => BadRequest(views.html.index())
+    // Step 1: get raw search results
+    service.getGoogleCollection(request.body.asFormUrlEncoded).value.map {
+      case Right(collection) => {
+        // Step 2: convert to list of DataModels
+        val bookList: Seq[DataModel] = service.extractBooksFromCollection(collection)
+        // Step 3: add books to database (for ids not already there)
+        if (addToDatabase == "true") bookList.map(book => repoService.create(book))
+        // Step 4: display the search results on a webpage
+        Ok(views.html.searchresults(bookList, addedToDatabase = addToDatabase == "true"))
       }
+      case Left(error) => BadRequest(views.html.unsuccessful(error.reason))
     }
   }
+//  def searchGoogleAndDisplay(): Action[AnyContent] = Action.async { implicit request =>
+//    accessToken
+//    // Step 0: process submitted search
+//    val search: String = request.body.asFormUrlEncoded.flatMap(_.get("search").flatMap(_.headOption)).getOrElse("")
+//    val keyword: String = request.body.asFormUrlEncoded.flatMap(_.get("keyword").flatMap(_.headOption)).getOrElse("")
+//    val termValue: String = request.body.asFormUrlEncoded.flatMap(_.get("term_value").flatMap(_.headOption)).getOrElse("")
+//    val addToDatabase: String = request.body.asFormUrlEncoded.flatMap(_.get("add_to_database").flatMap(_.headOption)).getOrElse("false")
+//
+//    if (keyword == "") Future.successful(BadRequest(views.html.searchresults(Seq(), addedToDatabase = false)))
+//    else {
+//      // Step 1: get raw search results
+//      val term = keyword + ":" + termValue
+//      service.getGoogleCollection(search = search, term = term).value.map {
+//        case Right(collection) => {
+//          // Step 2: convert to list of DataModels
+//          val bookList: Seq[DataModel] = service.extractBooksFromCollection(collection)
+//          // Step 3: add books to database (for ids not already there)
+//          if (addToDatabase == "true") bookList.map(book => repoService.create(book))
+//          // Step 4: display the search results on a webpage
+//          Ok(views.html.searchresults(bookList, addedToDatabase = addToDatabase == "true"))
+//        }
+//        case Left(error) => BadRequest(views.html.index())
+//      }
+//    }
+//  }
   def addFromSearch(): Action[AnyContent] = Action.async {implicit request =>
     accessToken
-    val id: String = request.body.asFormUrlEncoded.flatMap(_.get("_id").flatMap(_.headOption)).getOrElse("")
-    val name: String = request.body.asFormUrlEncoded.flatMap(_.get("name").flatMap(_.headOption)).getOrElse("")
-    val description: String = request.body.asFormUrlEncoded.flatMap(_.get("description").flatMap(_.headOption)).getOrElse("")
-    val pageCount: Int = request.body.asFormUrlEncoded.flatMap(_.get("pageCount").flatMap(_.headOption)).getOrElse("0").toInt
-
-    val book = DataModel(id, name, description, pageCount)
-    repoService.create(book).map{
-      case Right(_) => Ok(views.html.bookdetails(book))
+    repoService.create(request.body.asFormUrlEncoded).map{
+      case Right(book) => Ok(views.html.bookdetails(book))
       case Left(error) => {
         error.reason match {
           case "Bad response from upstream; got status: 500, and got reason: Book already exists in database"
