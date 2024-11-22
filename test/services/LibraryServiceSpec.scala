@@ -3,7 +3,7 @@ package services
 import baseSpec.BaseSpec
 import cats.data.EitherT
 import connectors.LibraryConnector
-import models.{APIError, Book, Collection, DataModel}
+import models.{APIError, Book, Collection, DataModel, VolumeInfo}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatestplus.play.guice.GuiceOneAppPerSuite
@@ -36,13 +36,11 @@ class LibraryServiceSpec extends BaseSpec with MockFactory with ScalaFutures wit
 
       // allows for the result to be waited for as the Future type can be seen as a placeholder for a value we don't have yet
       whenReady(testService.getGoogleCollection(urlOverride = Some(url), search = "", term = "").value) { result =>
-        result shouldBe Right(Collection("books#volumes", 1, Some(LibraryServiceSpec.testAPIItems)))
+        result shouldBe Right(LibraryServiceSpec.testAPICollection)
       }
     }
 
     "return an error" in {
-      val url: String = "testUrl"
-
       (mockConnector.get[Book](_: String)(_: OFormat[Book], _: ExecutionContext))
         .expects(url, *, *)
         .returning(EitherT.leftT(APIError.BadAPIResponse(500, "Could not connect")))// How do we return an error?
@@ -50,6 +48,56 @@ class LibraryServiceSpec extends BaseSpec with MockFactory with ScalaFutures wit
 
       whenReady(testService.getGoogleCollection(urlOverride = Some(url), search = "", term = "").value) { result =>
         result shouldBe Left(APIError.BadAPIResponse(500, "Could not connect"))
+      }
+    }
+  }
+
+  "getGoogleCollection (version called by ApplicationController searchGoogleAndDisplay())" should {
+    "return a Collection" in {
+      val reqBody = Some(Map(
+        "search" -> List("something"),
+        "keyword" -> List("inauthor"),
+        "term_value" -> List("something")
+      ))
+      val url = "https://www.googleapis.com/books/v1/volumes?q=something%inauthor:something"
+
+      (mockConnector.get[Collection](_: String)(_: OFormat[Collection], _: ExecutionContext))
+        .expects(url, *, *)
+        .returning(EitherT.rightT(LibraryServiceSpec.testAPIResult.as[Collection]))
+        .once()
+
+      whenReady(testService.getGoogleCollection(reqBody = reqBody).value) { result =>
+        result shouldBe Right(LibraryServiceSpec.testAPICollection)
+      }
+    }
+
+    "return an error from the connector" in {
+      val reqBody = Some(Map(
+        "search" -> List("something"),
+        "keyword" -> List("inauthor"),
+        "term_value" -> List("something")
+      ))
+      val url = "https://www.googleapis.com/books/v1/volumes?q=something%inauthor:something"
+
+      (mockConnector.get[Collection](_: String)(_: OFormat[Collection], _: ExecutionContext))
+        .expects(url, *, *)
+        .returning(EitherT.leftT(APIError.BadAPIResponse(500, "Could not connect")))
+        .once()
+
+      whenReady(testService.getGoogleCollection(reqBody = reqBody).value) { result =>
+        result shouldBe Left(APIError.BadAPIResponse(500, "Could not connect"))
+      }
+    }
+
+    "return an error if keyword is blank" in {
+      val reqBody = Some(Map(
+        "search" -> List("something"),
+        "keyword" -> List(""),
+        "term_value" -> List("something")
+      ))
+
+      whenReady(testService.getGoogleCollection(reqBody = reqBody).value) { result =>
+        result shouldBe Left(APIError.BadAPIResponse(400, "Keyword missing from search"))
       }
     }
   }
@@ -151,14 +199,15 @@ object LibraryServiceSpec {
     ]
   }""")
 
-  val testAPIItems: JsValue = (testAPIResult \ "items").get
-  val testAPIVolumeInfo: JsValue = (testAPIItems(0) \ "volumeInfo").get
-  val testAPIVolumeInfoNoDesc: JsValue = Json.parse(
-    """{"title": "The Decagon House Murders", "authors": ["Yukito Ayatsuji"], "publisher": "Pushkin Vertigo", "publishedDate": "2021-05-25", "pageCount": 289}""".stripMargin)
+  val testAPIVolumeInfo: VolumeInfo = VolumeInfo("The Decagon House Murders", Some("\"Ayatsuji's brilliant and richly atmospheric puzzle will appeal to fans of golden age whodunits...\""), 289)
+  val testAPIVolumeInfoNoDesc: VolumeInfo = VolumeInfo("The Decagon House Murders", None, 289)
 
-  val testAPICollection: Collection = Collection("books#volumes", 1, Some(testAPIItems))
   val testAPIBook: Book = Book("1GIrEAAAQBAJ", testAPIVolumeInfo)
   val testAPIBookNoDesc: Book = Book("1GIrEAAAQBAJ", testAPIVolumeInfoNoDesc)
+
+  val testAPIItems: Seq[Book] = Seq(testAPIBook)
+  val testAPICollection: Collection = Collection("books#volumes", 1, Some(testAPIItems))
+
   val testAPIDataModel: DataModel = DataModel("1GIrEAAAQBAJ", "The Decagon House Murders",
     "\"Ayatsuji's brilliant and richly atmospheric puzzle will appeal to fans of golden age whodunits...\"", 289)
   val testAPIDataModelNoDesc: DataModel = DataModel("1GIrEAAAQBAJ", "The Decagon House Murders", "", 289)

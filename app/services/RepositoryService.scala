@@ -18,6 +18,16 @@ class RepositoryService @Inject()(repositoryTrait: DataRepositoryTrait){
   def create(book: DataModel): Future[Either[APIError.BadAPIResponse, DataModel]] = {
     repositoryTrait.create(book)
   }
+  // version called by ApplicationController addFromSearch()
+  def create(reqBody: Option[Map[String, Seq[String]]]): Future[Either[APIError.BadAPIResponse, DataModel]] = {
+    val id: String = reqBody.flatMap(_.get("_id").flatMap(_.headOption)).getOrElse("")
+    val name: String = reqBody.flatMap(_.get("name").flatMap(_.headOption)).getOrElse("")
+    val description: String = reqBody.flatMap(_.get("description").flatMap(_.headOption)).getOrElse("")
+    val pageCount: Int = reqBody.flatMap(_.get("pageCount").flatMap(_.headOption)).getOrElse("0").toInt
+
+    val book = DataModel(id, name, description, pageCount)
+    repositoryTrait.create(book)
+  }
 
   def read(id: String): Future[Either[APIError, DataModel]] = {
     repositoryTrait.read(id)

@@ -7,16 +7,15 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatestplus.play.guice.GuiceOneAppPerSuite
 import services.LibraryServiceSpec
 import org.scalatest.concurrent.ScalaFutures
-import play.filters.csrf.CSRF
-import play.api.test.CSRFTokenHelper._
 import play.api.test.FakeRequest
-import play.api.http.Status
+import play.api.http.{HttpEntity, Status}
 import play.api.libs.json._
 import play.api.mvc._
 import play.api.test.Helpers._
 import services.LibraryService
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.{Await, ExecutionContext, Future}
+import scala.concurrent.duration._
 
 class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory {
   val mockLibraryService: LibraryService = mock[LibraryService]
@@ -75,6 +74,16 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
     "create a book in the database" in {
       beforeEach()
       val request: FakeRequest[JsValue] = buildPost("/api").withBody[JsValue](Json.toJson(dataModel))
+
+//      val createdResultAwait: Result = Await.result(TestApplicationController.create()(request), 100.milliseconds)
+//      createdResultAwait.header.status shouldBe Status.CREATED
+//      // Extract the response body from the Result
+//      val responseBody: String = createdResultAwait.body match {
+//        case HttpEntity.Strict(data, _) => data.decodeString("UTF-8")
+//        case _                          => throw new IllegalStateException("Unexpected response entity type")
+//      }
+//      // Parse the response body as JSON and cast to DataModel
+//      Json.parse(responseBody).as[DataModel] shouldBe dataModel
 
       val createdResult: Future[Result] = TestApplicationController.create()(request)
       status(createdResult) shouldBe Status.CREATED
@@ -273,6 +282,7 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
 
       val deleteResult: Future[Result] = TestApplicationController.delete("abcd")(FakeRequest())
       status(deleteResult) shouldBe Status.ACCEPTED
+      contentAsString(deleteResult) shouldBe "Book abcd has been deleted"
 
       // check that database is now empty
       val indexResult: Future[Result] = TestApplicationController.index()(FakeRequest())
@@ -314,7 +324,7 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
 
       val collectionResult: Future[Result] = TestApplicationController.getGoogleCollection(search = "", term = "")(FakeRequest())
       status(collectionResult) shouldBe OK
-      contentAsJson(collectionResult) shouldBe LibraryServiceSpec.testAPIResult
+      contentAsJson(collectionResult) shouldBe Json.toJson(LibraryServiceSpec.testAPICollection)
     }
   }
 
@@ -372,16 +382,13 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
     }
   }
 
-  "ApplicationController .searchBookByID()" should {
-    "retrieve the specified book's details" in {
+  "ApplicationController .showBookDetails()" should {
+    "display the specified book's details" in {
       beforeEach()
       val request: FakeRequest[JsValue] = buildPost("/api").withBody[JsValue](Json.toJson(dataModel))
       val createdResult: Future[Result] = TestApplicationController.create()(request)
 
-      val searchRequest: FakeRequest[AnyContentAsFormUrlEncoded] = buildPost("/searchid").withFormUrlEncodedBody(
-        "bookID" -> "abcd"
-      ) // .withCRSFToken not needed?
-      val searchResult: Future[Result] = TestApplicationController.searchBookByID()(searchRequest)
+      val searchResult: Future[Result] = TestApplicationController.showBookDetails("abcd")(FakeRequest())
       status(searchResult) shouldBe Status.OK
       contentAsString(searchResult) should include ("test name")
       afterEach()
@@ -389,13 +396,21 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
 
     "return a NotFound if the book is not in the database" in {
       beforeEach()
-      val searchRequest: FakeRequest[AnyContentAsFormUrlEncoded] = buildPost("/searchid").withFormUrlEncodedBody(
-        "bookID" -> "abcd"
-      ) // .withCRSFToken not needed?
-      val searchResult: Future[Result] = TestApplicationController.searchBookByID()(searchRequest)
+      val searchResult: Future[Result] = TestApplicationController.showBookDetails("abcd")(FakeRequest())
       status(searchResult) shouldBe Status.NOT_FOUND
       contentAsString(searchResult) should include ("Not found")
       afterEach()
+    }
+  }
+
+  "ApplicationController .searchBookByID()" should {
+    "redirect to book details page when an id is searched" in {
+      val searchRequest: FakeRequest[AnyContentAsFormUrlEncoded] = buildPost("/searchid").withFormUrlEncodedBody(
+        "bookID" -> "abcd"
+      )
+      val searchResult: Future[Result] = TestApplicationController.searchBookByID()(searchRequest)
+      status(searchResult) shouldBe Status.SEE_OTHER
+      redirectLocation(searchResult) shouldBe Some("/bookdetails/abcd")
     }
   }
 
@@ -431,13 +446,19 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
   "ApplicationController .searchGoogleAndDisplay()" should {
     "list the API search results without adding books to the database" in {
       beforeEach()
-      (mockLibraryService.getGoogleCollection(_: Option[String], _: String, _: String)(_: ExecutionContext))
-        .expects(None, *, *, *)
-        .returning(EitherT.rightT(LibraryServiceSpec.testAPIResult.as[Collection]))
+      val reqBody = Some(Map(
+        "search" -> List("something"),
+        "keyword" -> List("inauthor"),
+        "term_value" -> List("something")
+      ))
+
+      (mockLibraryService.getGoogleCollection(_: Option[Map[String, Seq[String]]])(_: ExecutionContext))
+        .expects(reqBody, *)
+        .returning(EitherT.rightT(LibraryServiceSpec.testAPICollection))
         .once()
 
       (mockLibraryService.extractBooksFromCollection(_: Collection))
-        .expects(*)
+        .expects(LibraryServiceSpec.testAPICollection)
         .returning(Seq(dataModel, dataModel2))
         .once()
 
@@ -460,13 +481,20 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
 
     "list the API search results and add the books to the database" in {
       beforeEach()
-      (mockLibraryService.getGoogleCollection(_: Option[String], _: String, _: String)(_: ExecutionContext))
-        .expects(None, *, *, *)
-        .returning(EitherT.rightT(LibraryServiceSpec.testAPIResult.as[Collection]))
+      val reqBody = Some(Map(
+        "search" -> List("something"),
+        "keyword" -> List("inauthor"),
+        "term_value" -> List("something"),
+        "add_to_database" -> List("true")
+      ))
+
+      (mockLibraryService.getGoogleCollection(_: Option[Map[String, Seq[String]]])(_: ExecutionContext))
+        .expects(reqBody, *)
+        .returning(EitherT.rightT(LibraryServiceSpec.testAPICollection))
         .once()
 
       (mockLibraryService.extractBooksFromCollection(_: Collection))
-        .expects(*)
+        .expects(LibraryServiceSpec.testAPICollection)
         .returning(Seq(dataModel, dataModel2))
         .once()
 
@@ -485,15 +513,21 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
       Thread.sleep(100) // allow time to add books to database
       val indexResult: Future[Result] = TestApplicationController.index()(FakeRequest())
       status(indexResult) shouldBe Status.OK
-      contentAsJson(indexResult).as[Seq[DataModel]] shouldBe Seq(dataModel, dataModel2) // database should contain the 2 books
+      contentAsJson(indexResult).as[Seq[DataModel]] should contain theSameElementsAs Seq(dataModel, dataModel2) // database should contain the 2 books
       afterEach()
     }
 
     "show 'no books found' if there are no search results" in {
       beforeEach()
-      (mockLibraryService.getGoogleCollection(_: Option[String], _: String, _: String)(_: ExecutionContext))
-        .expects(None, *, *, *)
-        .returning(EitherT.rightT(LibraryServiceSpec.testAPIResult.as[Collection]))
+      val reqBody = Some(Map(
+        "search" -> List("something"),
+        "keyword" -> List("inauthor"),
+        "term_value" -> List("something")
+      ))
+
+      (mockLibraryService.getGoogleCollection(_: Option[Map[String, Seq[String]]])(_: ExecutionContext))
+        .expects(reqBody, *)
+        .returning(EitherT.rightT(LibraryServiceSpec.testAPICollection))
         .once()
 
       (mockLibraryService.extractBooksFromCollection(_: Collection))
@@ -512,7 +546,18 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
       afterEach()
     }
 
-    "show 'no books found' if keyword is blank" in {
+    "return a BadRequest if keyword is blank" in {
+      val reqBody = Some(Map(
+        "search" -> List("something"),
+        "keyword" -> List(""),
+        "term_value" -> List("something")
+      ))
+
+      (mockLibraryService.getGoogleCollection(_: Option[Map[String, Seq[String]]])(_: ExecutionContext))
+        .expects(reqBody, *)
+        .returning(EitherT.leftT(APIError.BadAPIResponse(400, "Keyword missing from search")))
+        .once()
+
       val searchRequest: FakeRequest[AnyContentAsFormUrlEncoded] = buildPost("/searchgoogle").withFormUrlEncodedBody(
         "search" -> "something",
         "keyword" -> "",
@@ -520,7 +565,7 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
       ) // .withCRSFToken not needed?
       val searchResult: Future[Result] = TestApplicationController.searchGoogleAndDisplay()(searchRequest)
       status(searchResult) shouldBe Status.BAD_REQUEST
-      contentAsString(searchResult) should include ("No books found")
+      contentAsString(searchResult) should include ("Keyword missing from search")
     }
   }
 

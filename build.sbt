@@ -16,9 +16,12 @@ libraryDependencies ++= Seq(
   guice,
   "org.scalatest"          %% "scalatest"               % "3.2.15"             % Test,
   "org.scalamock"          %% "scalamock"               % "5.2.0"             % Test,
-  "org.scalatestplus.play" %% "scalatestplus-play"   % "5.1.0"          % Test
+  "org.scalatestplus.play" %% "scalatestplus-play"   % "5.1.0"          % Test,
+  "com.github.tomakehurst" % "wiremock-jre8" % "2.33.2" % Test
 )
 
 // for connectors
 libraryDependencies += ws
 libraryDependencies += ("org.typelevel"                %% "cats-core"                 % "2.3.0")
+
+dependencyOverrides +="com.fasterxml.jackson.core" % "jackson-databind" % "2.11.0"

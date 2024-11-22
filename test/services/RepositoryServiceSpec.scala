@@ -92,6 +92,39 @@ class RepositoryServiceSpec extends BaseSpec with MockFactory with ScalaFutures 
     }
   }
 
+  "create (version called by ApplicationController addFromSearch())" should {
+    // type is Option[Map[String, Seq[String]]]
+    val reqBody = Some(Map(
+      "_id" -> List("abcd"),
+      "name" -> List("test name"),
+      "description" -> List("test description"),
+      "pageCount" -> List("100")
+    ))
+
+    "return a DataModel" in {
+      (mockRepoTrait.create(_: DataModel))
+        .expects(dataModel)
+        .returning(Future(Right(dataModel)))
+        .once()
+
+      whenReady(testRepoService.create(reqBody)) { result =>
+        result shouldBe Right(dataModel)
+      }
+    }
+
+    "return an error" in {
+      (mockRepoTrait.create(_: DataModel))
+        .expects(*)
+        .returning(Future(Left(APIError.BadAPIResponse(500, "Bad response from upstream; got status: 500, and got reason: Unable to add book"))))
+        .once()
+
+      whenReady(testRepoService.create(dataModel)) { result =>
+        result shouldBe Left(APIError.BadAPIResponse(500, "Bad response from upstream; got status: 500, and got reason: Unable to add book"))
+      }
+    }
+  }
+
+
   "read" should {
     "return a DataModel" in {
       (mockRepoTrait.read(_: String))

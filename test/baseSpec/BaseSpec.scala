@@ -11,6 +11,7 @@ import play.api.Application
 import play.api.i18n.{Messages, MessagesApi}
 import play.api.inject.Injector
 import play.api.inject.guice.GuiceApplicationBuilder
+import play.api.libs.ws.WSClient
 import play.api.mvc.{AnyContentAsEmpty, MessagesControllerComponents}
 import play.api.test.CSRFTokenHelper.CSRFFRequestHeader
 import play.api.test.FakeRequest
@@ -26,6 +27,7 @@ trait BaseSpecWithApplication extends BaseSpec with GuiceOneServerPerSuite with 
 
   implicit val mat: Materializer = app.materializer
   implicit val executionContext: ExecutionContext = app.injector.instanceOf[ExecutionContext]
+  implicit val ws: WSClient = app.injector.instanceOf[WSClient]
 
   // created instances of the controller components and data repository - new instances will be made for each suite run
   lazy val component: MessagesControllerComponents = injector.instanceOf[MessagesControllerComponents]

@@ -10,10 +10,10 @@
     @helper.form(action = routes.ApplicationController.addBookForm()) {
       @helper.CSRF.formField
       @helper.inputText(dataForm("_id"), Symbol("_label") -> "ID")
-      @helper.inputText(dataForm("name"), Symbol("_label") -> "Name")
-      @helper.inputText(dataForm("description"), Symbol("_label") -> "Description")
+      @helper.inputText(dataForm("name"), Symbol("_label") -> "Name", Symbol("size") -> "40")
+      @helper.textarea(dataForm("description"), Symbol("_label") -> "Description", Symbol("rows") -> "5", Symbol("cols") -> "70")
       @helper.inputText(dataForm("pageCount"), Symbol("_label") -> "Page count")
-      <input class="submitButton" type="submit" value="Submit">
+      <input class="button-link" type="submit" value="Submit">
       }
     <br>
     <p><a href="@routes.HomeController.index()"> Back </a></p>

@@ -20,24 +20,29 @@ class LibraryService @Inject()(connector: LibraryConnector) {
   def getGoogleCollection(urlOverride: Option[String] = None, search: String, term: String)(implicit ec: ExecutionContext): EitherT[Future, APIError, Collection] = {
     connector.get[Collection](urlOverride.getOrElse(s"https://www.googleapis.com/books/v1/volumes?q=$search%$term"))
   }
+  // version called by ApplicationController searchGoogleAndDisplay()
+  def getGoogleCollection(reqBody: Option[Map[String, Seq[String]]])(implicit ec: ExecutionContext): EitherT[Future, APIError, Collection] = {
+    val search: String = reqBody.flatMap(_.get("search").flatMap(_.headOption)).getOrElse("")
+    val keyword: String = reqBody.flatMap(_.get("keyword").flatMap(_.headOption)).getOrElse("")
+    val termValue: String = reqBody.flatMap(_.get("term_value").flatMap(_.headOption)).getOrElse("")
+
+    if (keyword == "") EitherT.leftT(APIError.BadAPIResponse(400, "Keyword missing from search"))
+    else {
+      val term = keyword + ":" + termValue
+      connector.get[Collection](s"https://www.googleapis.com/books/v1/volumes?q=$search%$term")
+    }
+  }
 
   def extractBooksFromCollection(collection: Collection): Seq[DataModel] = {
     collection.items match {
-      case Some(itemsJson) =>{
-        itemsJson.as[Seq[JsValue]].map {
-          bookJson => convertBookToDataModel(bookJson.as[Book])
-        }
-      }
+      case Some(bookList) => bookList.map { book => convertBookToDataModel(book) }
       case None => Seq()
     }
   }
 
   def convertBookToDataModel(book: Book): DataModel = {
-    val volInfo = book.volumeInfo.as[VolumeInfo]
-    val bookDescription = volInfo.description match {
-      case Some(desc) => desc
-      case None => ""
-    }
+    val volInfo = book.volumeInfo
+    val bookDescription = volInfo.description.getOrElse("")
     DataModel(_id = book.id, name = volInfo.title, description = bookDescription, pageCount = volInfo.pageCount)
   }
 }
