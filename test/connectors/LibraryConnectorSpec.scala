@@ -114,7 +114,7 @@ class LibraryConnectorSpec extends BaseSpecWithApplication with BeforeAndAfterAl
               |  }
           """.stripMargin)))
 
-      whenReady(TestLibraryConnector.get[Collection]("http://localhost:8080/getgooglecollection/decagon/isbn:9781782276340").value) { result =>
+      whenReady(TestLibraryConnector.get[Collection](s"http://$Host:$Port/getgooglecollection/decagon/isbn:9781782276340").value) { result =>
         result shouldBe Right(Collection("books#volumes", 1, Some(Seq(Book("1GIrEAAAQBAJ", LibraryServiceSpec.testAPIVolumeInfo)))))
       }
     }
@@ -126,7 +126,7 @@ class LibraryConnectorSpec extends BaseSpecWithApplication with BeforeAndAfterAl
           .withHeader("Content-Type", "application/json")
           .withBody("""{"kind": "books#volumes", "totalItems": 0}""")))
 
-      whenReady(TestLibraryConnector.get[Collection]("http://localhost:8080/getgooglecollection/decagon/isbn:123").value) { result =>
+      whenReady(TestLibraryConnector.get[Collection](s"http://$Host:$Port/getgooglecollection/decagon/isbn:123").value) { result =>
         result shouldBe Right(Collection("books#volumes", 0, None))
       }
     }
@@ -144,7 +144,7 @@ class LibraryConnectorSpec extends BaseSpecWithApplication with BeforeAndAfterAl
               |  "following": 0
               |}""".stripMargin)))
 
-      whenReady(TestLibraryConnector.get[Collection]("http://localhost:8080/getgooglecollection/decagon/isbn:123").value) { result =>
+      whenReady(TestLibraryConnector.get[Collection](s"http://$Host:$Port/getgooglecollection/decagon/isbn:123").value) { result =>
         result shouldBe Left(APIError.BadAPIResponse(500, "Could not connect"))
       }
     }

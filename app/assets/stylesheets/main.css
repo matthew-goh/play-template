@@ -76,6 +76,20 @@ button:hover {
     margin-bottom: 15px;
 }
 
+.button-link {
+    display: inline-block;       /* Makes the <a> behave like a block-level element for padding/margins */
+    padding: 10px 15px;          /* Adds space inside the button */
+    font-size: 16px;             /* Sets the font size */
+    color: white;                /* Sets the text color */
+    background-color: #3498db;  /* Button background color */
+    border: none;                /* Removes border */
+    border-radius: 5px;          /* Rounds the corners */
+    text-decoration: none;       /* Removes underline */
+    text-align: center;          /* Centers text */
+    cursor: pointer;             /* Changes the cursor to pointer on hover */
+    /*margin-left: 15px;*/
+}
+
 /* Images */
 img {
     max-width: 100%;
@@ -92,4 +106,30 @@ table {
 th, td {
     border: 1px solid grey;
     padding: 8px; /* Adds spacing inside the cells */
+}
+
+/* Form inputs */
+.info { /* "Required" text below commit message field */
+    color: grey;
+    font-size: 0.9em; /* Adjust size as needed */
+}
+
+input[type="text"],
+textarea,
+select{
+    border: 1px solid #ccc;    /* Add a border to inputs */
+    padding: 10px;             /* Add padding */
+    font-size: 14px;           /* Adjust font size */
+    border-radius: 4px;        /* Rounded corners */
+}
+
+label {
+    font-size: 16px;           /* Adjust label font size */
+    color: #333;               /* Set label text color */
+    font-weight: bold;         /* Make label text bold */
+}
+
+input[type="checkbox"] {
+    transform: scale(1.2);
+    margin: 10px;
 }
