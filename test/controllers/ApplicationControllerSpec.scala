@@ -422,6 +422,7 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
       val request2: FakeRequest[JsValue] = buildPost("/api").withBody[JsValue](Json.toJson(newDataModel))
       val createdResult2: Future[Result] = TestApplicationController.create()(request2)
 
+      Thread.sleep(100)
       val searchRequest: FakeRequest[AnyContentAsFormUrlEncoded] = buildPost("/searchtitle").withFormUrlEncodedBody(
         "title" -> "test"
       ) // .withCRSFToken not needed?
