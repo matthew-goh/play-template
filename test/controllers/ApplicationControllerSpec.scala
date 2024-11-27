@@ -207,12 +207,25 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
       afterEach()
     }
 
-    "add the book to the database if it could not be found" in { // upsert(true)
+//    "add the book to the database if it could not be found" in { // upsert(true)
+//      beforeEach()
+//      val updateRequest: FakeRequest[JsValue] = buildPost("/api/${dataModel._id}").withBody[JsValue](Json.toJson(newDataModel))
+//      val updateResult = TestApplicationController.update("abcd")(updateRequest) // Future(<not completed>)
+//      status(updateResult) shouldBe Status.ACCEPTED
+//      contentAsJson(updateResult).as[DataModel] shouldBe newDataModel
+//      afterEach()
+//    }
+    "return a BadRequest if the user could not be found" in { // upsert(false)
       beforeEach()
       val updateRequest: FakeRequest[JsValue] = buildPost("/api/${dataModel._id}").withBody[JsValue](Json.toJson(newDataModel))
-      val updateResult = TestApplicationController.update("abcd")(updateRequest) // Future(<not completed>)
-      status(updateResult) shouldBe Status.ACCEPTED
-      contentAsJson(updateResult).as[DataModel] shouldBe newDataModel
+      val updateResult = TestApplicationController.update("abcd")(updateRequest)
+      status(updateResult) shouldBe Status.BAD_REQUEST
+      contentAsString(updateResult) shouldBe "Bad response from upstream; got status: 404, and got reason: Book not found"
+
+      // check that database is still empty
+      val indexResult: Future[Result] = TestApplicationController.index()(FakeRequest())
+      status(indexResult) shouldBe Status.OK
+      contentAsJson(indexResult).as[Seq[DataModel]] shouldBe Seq()
       afterEach()
     }
   }
@@ -373,7 +386,7 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
       afterEach()
     }
 
-    "show 'no books found' if the database is empty" in {
+    "show 'No books found' if the database is empty" in {
       beforeEach()
       val listingResult: Future[Result] = TestApplicationController.listAllBooks()(FakeRequest())
       status(listingResult) shouldBe Status.OK
@@ -404,13 +417,22 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
   }
 
   "ApplicationController .searchBookByID()" should {
-    "redirect to book details page when an id is searched" in {
+    "redirect to book details page when an ID is searched" in {
       val searchRequest: FakeRequest[AnyContentAsFormUrlEncoded] = buildPost("/searchid").withFormUrlEncodedBody(
         "bookID" -> "abcd"
       )
       val searchResult: Future[Result] = TestApplicationController.searchBookByID()(searchRequest)
       status(searchResult) shouldBe Status.SEE_OTHER
       redirectLocation(searchResult) shouldBe Some("/bookdetails/abcd")
+    }
+
+    "return a BadRequest if ID is blank" in {
+      val searchRequest: FakeRequest[AnyContentAsFormUrlEncoded] = buildPost("/searchid").withFormUrlEncodedBody(
+        "bookID" -> ""
+      )
+      val searchResult: Future[Result] = TestApplicationController.searchBookByID()(searchRequest)
+      status(searchResult) shouldBe Status.BAD_REQUEST
+      contentAsString(searchResult) should include ("No ID provided")
     }
   }
 
@@ -429,10 +451,11 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
       val searchResult: Future[Result] = TestApplicationController.searchBookByTitle()(searchRequest)
       status(searchResult) shouldBe Status.OK
       contentAsString(searchResult) should include ("test name")
+      contentAsString(searchResult) shouldNot include ("new name")
       afterEach()
     }
 
-    "show 'no books found' if the database is empty" in {
+    "show 'No books found' if the database is empty" in {
       beforeEach()
       val searchRequest: FakeRequest[AnyContentAsFormUrlEncoded] = buildPost("/searchtitle").withFormUrlEncodedBody(
         "title" -> " name"
@@ -441,6 +464,15 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
       status(searchResult) shouldBe Status.OK
       contentAsString(searchResult) should include ("No books found")
       afterEach()
+    }
+
+    "return a BadRequest if title is blank" in {
+      val searchRequest: FakeRequest[AnyContentAsFormUrlEncoded] = buildPost("/searchid").withFormUrlEncodedBody(
+        "title" -> ""
+      )
+      val searchResult: Future[Result] = TestApplicationController.searchBookByTitle()(searchRequest)
+      status(searchResult) shouldBe Status.BAD_REQUEST
+      contentAsString(searchResult) should include ("No title provided")
     }
   }
 
@@ -518,7 +550,7 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
       afterEach()
     }
 
-    "show 'no books found' if there are no search results" in {
+    "show 'No books found' if there are no search results" in {
       beforeEach()
       val reqBody = Some(Map(
         "search" -> List("something"),

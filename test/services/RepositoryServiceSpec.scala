@@ -6,7 +6,7 @@ import models.{APIError, DataModel}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatestplus.play.guice.GuiceOneAppPerSuite
-import repositories.DataRepositoryTrait
+import repositories.{DataModelFields, DataRepositoryTrait}
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -59,11 +59,11 @@ class RepositoryServiceSpec extends BaseSpec with MockFactory with ScalaFutures 
     "return an error" in {
       (mockRepoTrait.index _)
         .expects()
-        .returning(Future(Left(APIError.BadAPIResponse(500, "Bad response from upstream; got status: 404, and got reason: Repository not found"))))
+        .returning(Future(Left(APIError.BadAPIResponse(404, "Database collection not found"))))
         .once()
 
         whenReady(testRepoService.index()) { result =>
-        result shouldBe Left(APIError.BadAPIResponse(500, "Bad response from upstream; got status: 404, and got reason: Repository not found"))
+        result shouldBe Left(APIError.BadAPIResponse(404, "Database collection not found"))
       }
     }
   }
@@ -83,25 +83,24 @@ class RepositoryServiceSpec extends BaseSpec with MockFactory with ScalaFutures 
     "return an error" in {
       (mockRepoTrait.create(_: DataModel))
         .expects(*)
-        .returning(Future(Left(APIError.BadAPIResponse(500, "Bad response from upstream; got status: 500, and got reason: Unable to add book"))))
+        .returning(Future(Left(APIError.BadAPIResponse(500, "Unable to add book"))))
         .once()
 
       whenReady(testRepoService.create(dataModel)) { result =>
-        result shouldBe Left(APIError.BadAPIResponse(500, "Bad response from upstream; got status: 500, and got reason: Unable to add book"))
+        result shouldBe Left(APIError.BadAPIResponse(500, "Unable to add book"))
       }
     }
   }
 
   "create (version called by ApplicationController addFromSearch())" should {
-    // type is Option[Map[String, Seq[String]]]
-    val reqBody = Some(Map(
-      "_id" -> List("abcd"),
-      "name" -> List("test name"),
-      "description" -> List("test description"),
-      "pageCount" -> List("100")
-    ))
-
     "return a DataModel" in {
+      val reqBody = Some(Map(
+        "_id" -> List("abcd"),
+        "name" -> List("test name"),
+        "description" -> List("test description"),
+        "pageCount" -> List("100")
+      ))
+
       (mockRepoTrait.create(_: DataModel))
         .expects(dataModel)
         .returning(Future(Right(dataModel)))
@@ -112,14 +111,47 @@ class RepositoryServiceSpec extends BaseSpec with MockFactory with ScalaFutures 
       }
     }
 
-    "return an error" in {
+    "return an error from DataRepository" in {
+      val reqBody = Some(Map(
+        "_id" -> List("abcd"),
+        "name" -> List("test name"),
+        "description" -> List("test description"),
+        "pageCount" -> List("100")
+      ))
+
       (mockRepoTrait.create(_: DataModel))
         .expects(*)
-        .returning(Future(Left(APIError.BadAPIResponse(500, "Bad response from upstream; got status: 500, and got reason: Unable to add book"))))
+        .returning(Future(Left(APIError.BadAPIResponse(500, "Book already exists in database"))))
         .once()
 
-      whenReady(testRepoService.create(dataModel)) { result =>
-        result shouldBe Left(APIError.BadAPIResponse(500, "Bad response from upstream; got status: 500, and got reason: Unable to add book"))
+      whenReady(testRepoService.create(reqBody)) { result =>
+        result shouldBe Left(APIError.BadAPIResponse(500, "Book already exists in database"))
+      }
+    }
+
+    "return an error if a required value is missing" in {
+      val reqBody = Some(Map(
+        "_id" -> List(),
+        "name" -> List("test name"),
+        "description" -> List("test description"),
+        "pageCount" -> List("100")
+      ))
+
+      whenReady(testRepoService.create(reqBody)) { result =>
+        result shouldBe Left(APIError.BadAPIResponse(400, "Missing required value"))
+      }
+    }
+
+    "return an error if an incorrect data type is provided" in {
+      val reqBody = Some(Map(
+        "_id" -> List("abcd"),
+        "name" -> List("test name"),
+        "description" -> List("test description"),
+        "pageCount" -> List("1xx")
+      ))
+
+      whenReady(testRepoService.create(reqBody)) { result =>
+        result shouldBe Left(APIError.BadAPIResponse(400, "Invalid data type"))
       }
     }
   }
@@ -140,19 +172,19 @@ class RepositoryServiceSpec extends BaseSpec with MockFactory with ScalaFutures 
     "return an error" in {
       (mockRepoTrait.read(_: String))
         .expects(*)
-        .returning(Future(Left(APIError.BadAPIResponse(500, "Bad response from upstream; got status: 404, and got reason: Book not found"))))
+        .returning(Future(Left(APIError.BadAPIResponse(404, "Book not found"))))
         .once()
 
       whenReady(testRepoService.read("abcd")) { result =>
-        result shouldBe Left(APIError.BadAPIResponse(500, "Bad response from upstream; got status: 404, and got reason: Book not found"))
+        result shouldBe Left(APIError.BadAPIResponse(404, "Book not found"))
       }
     }
   }
 
   "readBySpecifiedField" should {
     "return a list of DataModels" in {
-      (mockRepoTrait.readBySpecifiedField(_: String, _: String))
-        .expects(*, *)
+      (mockRepoTrait.readBySpecifiedField(_: DataModelFields.Value, _: String))
+        .expects(DataModelFields.name, "test name")
         .returning(Future(Right(Seq(dataModel))))
         .once()
 
@@ -161,14 +193,20 @@ class RepositoryServiceSpec extends BaseSpec with MockFactory with ScalaFutures 
       }
     }
 
-    "return an error" in {
-      (mockRepoTrait.readBySpecifiedField(_: String, _: String))
-        .expects(*, *)
-        .returning(Future(Left(APIError.BadAPIResponse(500, "Bad response from upstream; got status: 500, and got reason: Invalid field to search"))))
+    "return an error from DataRepository" in {
+      (mockRepoTrait.readBySpecifiedField(_: DataModelFields.Value, _: String))
+        .expects(DataModelFields.description, "abc")
+        .returning(Future(Left(APIError.BadAPIResponse(500, "Unable to search for books"))))
         .once()
 
-      whenReady(testRepoService.readBySpecifiedField("bad field", "aaa")) { result =>
-        result shouldBe Left(APIError.BadAPIResponse(500, "Bad response from upstream; got status: 500, and got reason: Invalid field to search"))
+      whenReady(testRepoService.readBySpecifiedField("description", "abc")) { result =>
+        result shouldBe Left(APIError.BadAPIResponse(500, "Unable to search for books"))
+      }
+    }
+
+    "return an error if an invalid field is provided" in {
+      whenReady(testRepoService.readBySpecifiedField("bad field", "123")) { result =>
+        result shouldBe Left(APIError.BadAPIResponse(500, "Invalid field to search"))
       }
     }
   }
@@ -188,19 +226,19 @@ class RepositoryServiceSpec extends BaseSpec with MockFactory with ScalaFutures 
     "return an error" in {
       (mockRepoTrait.update(_: String, _: DataModel))
         .expects(*, *)
-        .returning(Future(Left(APIError.BadAPIResponse(500, "Bad response from upstream; got status: 500, and got reason: Unable to update book"))))
+        .returning(Future(Left(APIError.BadAPIResponse(500, "Unable to update book"))))
         .once()
 
       whenReady(testRepoService.update("abcd", dataModel)) { result =>
-        result shouldBe Left(APIError.BadAPIResponse(500, "Bad response from upstream; got status: 500, and got reason: Unable to update book"))
+        result shouldBe Left(APIError.BadAPIResponse(500, "Unable to update book"))
       }
     }
   }
 
   "updateWithValue" should {
     "return an UpdateResult" in {
-      (mockRepoTrait.updateWithValue(_: String, _: String, _: String))
-        .expects(*, *, *)
+      (mockRepoTrait.updateWithValue(_: String, _: DataModelFields.Value, _: String))
+        .expects("abcd", DataModelFields.pageCount, "250")
         .returning(Future(Right(testUpdateResult)))
         .once()
 
@@ -209,14 +247,20 @@ class RepositoryServiceSpec extends BaseSpec with MockFactory with ScalaFutures 
       }
     }
 
-    "return an error" in {
-      (mockRepoTrait.updateWithValue(_: String, _: String, _: String))
-        .expects(*, *, *)
-        .returning(Future(Left(APIError.BadAPIResponse(500, "Bad response from upstream; got status: 500, and got reason: Invalid field to update"))))
+    "return an error from DataRepository" in {
+      (mockRepoTrait.updateWithValue(_: String, _: DataModelFields.Value, _: String))
+        .expects("abcd", DataModelFields._id, "new")
+        .returning(Future(Left(APIError.BadAPIResponse(500, "Cannot update book ID"))))
         .once()
 
+      whenReady(testRepoService.updateWithValue("abcd", "_id", "new")) { result =>
+        result shouldBe Left(APIError.BadAPIResponse(500, "Cannot update book ID"))
+      }
+    }
+
+    "return an error if an invalid field is provided" in {
       whenReady(testRepoService.updateWithValue("abcd", "pgCount", "250")) { result =>
-        result shouldBe Left(APIError.BadAPIResponse(500, "Bad response from upstream; got status: 500, and got reason: Invalid field to update"))
+        result shouldBe Left(APIError.BadAPIResponse(500, "Invalid field to update"))
       }
     }
   }
@@ -236,11 +280,11 @@ class RepositoryServiceSpec extends BaseSpec with MockFactory with ScalaFutures 
     "return an error" in {
       (mockRepoTrait.delete(_: String))
         .expects(*)
-        .returning(Future(Left(APIError.BadAPIResponse(500, "Bad response from upstream; got status: 500, and got reason: Unable to delete book"))))
+        .returning(Future(Left(APIError.BadAPIResponse(500, "Unable to delete book"))))
         .once()
 
       whenReady(testRepoService.delete("abcd")) { result =>
-        result shouldBe Left(APIError.BadAPIResponse(500, "Bad response from upstream; got status: 500, and got reason: Unable to delete book"))
+        result shouldBe Left(APIError.BadAPIResponse(500, "Unable to delete book"))
       }
     }
   }
