@@ -8,7 +8,7 @@ import org.scalatestplus.play.guice.GuiceOneAppPerSuite
 import services.LibraryServiceSpec
 import org.scalatest.concurrent.ScalaFutures
 import play.api.test.FakeRequest
-import play.api.http.{HttpEntity, Status}
+import play.api.http.Status
 import play.api.libs.json._
 import play.api.mvc._
 import play.api.test.Helpers._
