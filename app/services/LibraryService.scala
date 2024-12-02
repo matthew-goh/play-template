@@ -22,14 +22,15 @@ class LibraryService @Inject()(connector: LibraryConnector) {
   }
   // version called by ApplicationController searchGoogleAndDisplay()
   def getGoogleCollection(reqBody: Option[Map[String, Seq[String]]])(implicit ec: ExecutionContext): EitherT[Future, APIError, Collection] = {
-    val search: String = reqBody.flatMap(_.get("search").flatMap(_.headOption)).getOrElse("")
-    val keyword: String = reqBody.flatMap(_.get("keyword").flatMap(_.headOption)).getOrElse("")
-    val termValue: String = reqBody.flatMap(_.get("term_value").flatMap(_.headOption)).getOrElse("")
-
-    if (keyword == "") EitherT.leftT(APIError.BadAPIResponse(400, "Keyword missing from search"))
-    else {
-      val term = keyword + ":" + termValue
-      connector.get[Collection](s"https://www.googleapis.com/books/v1/volumes?q=$search%$term")
+    val keyword: Option[String] = reqBody.flatMap(_.get("keyword").flatMap(_.headOption))
+    keyword match {
+      case None | Some("") => EitherT.leftT(APIError.BadAPIResponse(400, "Keyword missing from search"))
+      case Some(kw) => {
+        val search: String = reqBody.flatMap(_.get("search").flatMap(_.headOption)).getOrElse("")
+        val termValue: String = reqBody.flatMap(_.get("term_value").flatMap(_.headOption)).getOrElse("")
+        val term = kw + ":" + termValue
+        connector.get[Collection](s"https://www.googleapis.com/books/v1/volumes?q=$search%$term")
+      }
     }
   }
 

@@ -13,7 +13,7 @@ import scala.concurrent.{ExecutionContext, Future}
 class ApplicationController @Inject()(repoService: RepositoryService, service: LibraryService, val controllerComponents: ControllerComponents)
                                      (implicit ec: ExecutionContext) extends BaseController with play.api.i18n.I18nSupport {
   ///// METHODS CALLED BY FRONTEND /////
-  def accessToken(implicit request: Request[_]) = {
+  def accessToken()(implicit request: Request[_]): Option[CSRF.Token] = {
     CSRF.getToken
   }
 
@@ -35,27 +35,30 @@ class ApplicationController @Inject()(repoService: RepositoryService, service: L
     }
   }
   def searchBookByID(): Action[AnyContent] = Action.async {implicit request =>
-    accessToken
-    val idToSearch: String = request.body.asFormUrlEncoded.flatMap(_.get("bookID").flatMap(_.headOption)).get
-    Future.successful(Redirect(routes.ApplicationController.showBookDetails(idToSearch)))
+    accessToken()
+    val idToSearch: Option[String] = request.body.asFormUrlEncoded.flatMap(_.get("bookID").flatMap(_.headOption))
+    idToSearch match {
+      case None | Some("") => Future.successful(BadRequest(views.html.unsuccessful("No ID provided")))
+      case Some(id) => Future.successful(Redirect(routes.ApplicationController.showBookDetails(id)))
+    }
   }
 
   def searchBookByTitle(): Action[AnyContent] = Action.async {implicit request =>
-    accessToken
+    accessToken()
     val titleToSearch: Option[String] = request.body.asFormUrlEncoded.flatMap(_.get("title").flatMap(_.headOption))
     titleToSearch match {
+      case None | Some("") => Future.successful(BadRequest(views.html.unsuccessful("No title provided")))
       case Some(title) => {
         repoService.readBySpecifiedField("name", title).map{
           case Right(books) => Ok(views.html.listing(books))
-          case Left(error) => BadRequest(views.html.listing(Seq()))
+          case Left(error) => BadRequest(views.html.unsuccessful(error.reason))
         }
       }
-      case None => Future.successful(BadRequest(views.html.listing(Seq())))
     }
   }
 
   def searchGoogleAndDisplay(): Action[AnyContent] = Action.async { implicit request =>
-    accessToken
+    accessToken()
     val addToDatabase: String = request.body.asFormUrlEncoded.flatMap(_.get("add_to_database").flatMap(_.headOption)).getOrElse("false")
     // Step 1: get raw search results
     service.getGoogleCollection(request.body.asFormUrlEncoded).value.map {
@@ -96,14 +99,14 @@ class ApplicationController @Inject()(repoService: RepositoryService, service: L
 //    }
 //  }
   def addFromSearch(): Action[AnyContent] = Action.async {implicit request =>
-    accessToken
+    accessToken()
     repoService.create(request.body.asFormUrlEncoded).map{
       case Right(book) => Ok(views.html.bookdetails(book))
       case Left(error) => {
         error.reason match {
           case "Bad response from upstream; got status: 500, and got reason: Book already exists in database"
           => BadRequest(views.html.unsuccessful("Book ID already exists in database"))
-          case _ => BadRequest("Unable to add book.")
+          case _ => BadRequest(views.html.unsuccessful(error.reason))
         }
       }
     }
@@ -115,7 +118,7 @@ class ApplicationController @Inject()(repoService: RepositoryService, service: L
   }
   // called when add book form is submitted
   def addBookForm(): Action[AnyContent] =  Action.async {implicit request =>
-    accessToken //call the accessToken method
+    accessToken() //call the accessToken method
     DataModel.dataForm.bindFromRequest().fold( //from the implicit request we want to bind this to the form in our companion object
       formWithErrors => {
         //here write what you want to do if the form has errors
@@ -129,7 +132,7 @@ class ApplicationController @Inject()(repoService: RepositoryService, service: L
             error.reason match {
               case "Bad response from upstream; got status: 500, and got reason: Book already exists in database"
                 => BadRequest(views.html.unsuccessful("Book ID already exists in database"))
-              case _ => BadRequest("Unable to add book.")
+              case _ => BadRequest(views.html.unsuccessful(error.reason))
             }
           }
         }
@@ -148,7 +151,7 @@ class ApplicationController @Inject()(repoService: RepositoryService, service: L
     }
   }
   def updateBookForm(): Action[AnyContent] =  Action.async {implicit request =>
-    accessToken //call the accessToken method
+    accessToken() //call the accessToken method
     DataModel.dataForm.bindFromRequest().fold( //from the implicit request we want to bind this to the form in our companion object
       formWithErrors => {
         Future.successful(BadRequest(views.html.update(formWithErrors)))
@@ -210,7 +213,7 @@ class ApplicationController @Inject()(repoService: RepositoryService, service: L
       case JsSuccess(dataModel, _) =>
         repoService.update(id, dataModel).map{
           case Right(_) => Accepted {Json.toJson(request.body)}
-          case Left(error) => Status(error.httpResponseStatus)(error.reason)
+          case Left(error) => BadRequest {error.reason}
         } // dataRepository.update() is a Future[Either[APIError, result.UpdateResult]]
       case JsError(_) => Future(BadRequest {"Invalid request body"})
     }

@@ -5,7 +5,7 @@ import models.{APIError, DataModel}
 import org.mongodb.scala.bson.conversions.Bson
 import org.mongodb.scala.model.Filters.empty
 import org.mongodb.scala.model._
-import org.mongodb.scala.result
+import org.mongodb.scala.{MongoWriteException, result}
 import uk.gov.hmrc.mongo.MongoComponent
 import uk.gov.hmrc.mongo.play.json.PlayMongoRepository
 
@@ -24,29 +24,30 @@ class DataRepository @Inject()(mongoComponent: MongoComponent)
   domainFormat = DataModel.formats, // uses the implicit val formats in the DataModel object
   //-tells the driver how to read and write between a DataModel and JSON
   indexes = Seq(IndexModel(
-    Indexes.ascending("_id")
-  )), // can ensure the bookId to be unique
+    Indexes.ascending("_id") // using book ID as MongoDB's unique-valued _id field
+  )),
   replaceIndexes = false
 ) with DataRepositoryTrait {
+
   // list all DataModels in the database (one DataModel is one book)
   def index(): Future[Either[APIError.BadAPIResponse, Seq[DataModel]]]  = {
-    try {
-      collection.find().toFuture().map{ books: Seq[DataModel] => Right(books) }
-    }
-    catch {
-      case e: Exception => Future(Left(APIError.BadAPIResponse(404, "Database not found")))
-    }
+    collection.find().toFuture().map{ books: Seq[DataModel] => Right(books) }
+      .recover{
+        case e: Exception => Left(APIError.BadAPIResponse(404, "Database collection not found"))
+      }
   }
 
   // add a DataModel object to database
   def create(book: DataModel): Future[Either[APIError.BadAPIResponse, DataModel]] = {
-    try {
-      collection.insertOne(book).toFuture()
-        .map(_ => Right(book))
-        .recover { case _ => Left(APIError.BadAPIResponse(500, "Book already exists in database")) }
-    }
-    catch {
-      case e: Exception => Future(Left(APIError.BadAPIResponse(500, "Unable to add book")))
+    collection.insertOne(book).toFuture().map { insertResult =>
+      if (insertResult.wasAcknowledged) {
+        Right(book)
+      } else {
+        Left(APIError.BadAPIResponse(500, "Error: Insertion not acknowledged"))
+      }
+    }.recover {
+      case e: MongoWriteException => Left(APIError.BadAPIResponse(500, "Book already exists in database"))
+      case e: Exception => Left(APIError.BadAPIResponse(500, s"Unable to add book: ${e.getMessage}"))
     }
   }
 
@@ -60,103 +61,98 @@ class DataRepository @Inject()(mongoComponent: MongoComponent)
 //    )
   private def bySpecifiedField(field: String, value: String): Bson =
     Filters.and(
-//      Filters.equal(field, value)
         Filters.regex(field, s".*${value}.*", "i") // case-insensitive regex filter, containing search value
     )
 
   // retrieve a DataModel object from database - uses an id parameter
   def read(id: String): Future[Either[APIError, DataModel]] = {
-    try {
-      collection.find(byID(id)).headOption flatMap {
-        case Some(data) => Future(Right(data))
-        case None => Future(Left(APIError.BadAPIResponse(404, "Book not found")))
-      }
-    }
-    catch {
-      case e: Exception => Future(Left(APIError.BadAPIResponse(500, "Unable to search for book")))
+    collection.find(byID(id)).headOption.flatMap {
+      case Some(data) => Future(Right(data))
+      case None => Future(Left(APIError.BadAPIResponse(404, "Book not found")))
+    }.recover {
+      case e: Exception => Left(APIError.BadAPIResponse(500, s"Unable to search for book: ${e.getMessage}"))
     }
   }
 
-  // retrieve a list of DataModel objects for which a specified field equals a specified value
-  def readBySpecifiedField(field: String, value: String): Future[Either[APIError, Seq[DataModel]]] = {
+  // retrieve a list of DataModel objects for which a specified field contains a specified value
+  def readBySpecifiedField(field: DataModelFields.Value, value: String): Future[Either[APIError, Seq[DataModel]]] = {
     field match {
-      case "_id" | "name" | "description" => {
-        try {
-          collection.find(bySpecifiedField(field, value)).toFuture().map(books => Right(books))
-        }
-        catch {
-          case e: Exception => Future(Left(APIError.BadAPIResponse(500, "Unable to search for books")))
-        }
+      case DataModelFields._id | DataModelFields.name | DataModelFields.description => {
+        collection.find(bySpecifiedField(field.toString, value)).toFuture().map(books => Right(books))
+          .recover {
+            case e: Exception => Left(APIError.BadAPIResponse(500, s"Unable to search for books: ${e.getMessage}"))
+          }
       }
-      case _ => Future(Left(APIError.BadAPIResponse(500, "Invalid field to search")))
+      case DataModelFields.pageCount => Future(Left(APIError.BadAPIResponse(500, "Cannot search page count")))
     }
   }
 
   // takes in a DataModel, finds a matching document with the same id and updates the document, then returns the updated DataModel
   def update(id: String, book: DataModel): Future[Either[APIError, result.UpdateResult]] = {
-    try {
-      collection.replaceOne(
-        filter = byID(id),
-        replacement = book,
-        options = new ReplaceOptions().upsert(true) //What happens when we set this to false?
-      ).toFuture().map(result => Right(result))
-    }
-    catch {
-      case e: Exception => Future(Left(APIError.BadAPIResponse(500, "Unable to update book")))
+    collection.replaceOne(
+      filter = byID(id),
+      replacement = book,
+      options = new ReplaceOptions().upsert(false) // don't add to database if user doesn't exist
+    ).toFuture().map {
+      updateResult =>
+        if (updateResult.wasAcknowledged) {
+          updateResult.getMatchedCount match {
+            case 1 => Right(updateResult)
+            case 0 => Left(APIError.BadAPIResponse(404, "Book not found"))
+            case _ => Left(APIError.BadAPIResponse(500, "Error: Multiple books with same ID found"))
+          }
+        } else {
+          Left(APIError.BadAPIResponse(500, "Error: Update not acknowledged"))
+        }
+    }.recover {
+      case e: Exception => Left(APIError.BadAPIResponse(500, s"Unable to update book: ${e.getMessage}"))
     }
   }
-  // Right result is e.g. AcknowledgedUpdateResult{matchedCount=1, modifiedCount=1, upsertedId=null}
+  // updateResult is e.g. AcknowledgedUpdateResult{matchedCount=1, modifiedCount=1, upsertedId=null}
 
-  def updateWithValue(id: String, field: String, newValue: String): Future[Either[APIError, result.UpdateResult]] = {
+  private def isIntegerString(value: String): Boolean = value.forall(Character.isDigit)
+  def updateWithValue(id: String, field: DataModelFields.Value, newValue: String): Future[Either[APIError, result.UpdateResult]] = {
     field match {
-      case "name" | "description" =>
-        try {
-          collection.updateOne(Filters.equal("_id", id), Updates.set(field, newValue)).toFuture().map{
-              updateResult =>
-                if (updateResult.getMatchedCount == 0) Left(APIError.BadAPIResponse(404, "Book not found"))
-                else Right(updateResult)
-            }
+      case DataModelFields.name | DataModelFields.description =>
+        collection.updateOne(Filters.equal("_id", id), Updates.set(field.toString, newValue)).toFuture().map{
+          updateResult =>
+            if (updateResult.getMatchedCount == 0) Left(APIError.BadAPIResponse(404, "Book not found"))
+            else Right(updateResult)
+        }.recover {
+          case e: Exception => Left(APIError.BadAPIResponse(500, s"Unable to update book: ${e.getMessage}"))
         }
-        catch {
-          case e: Exception => Future(Left(APIError.BadAPIResponse(500, "Unable to update book")))
-        }
-      case "pageCount" =>
-        if(!newValue.forall(Character.isDigit)) {
-          Future(Left(APIError.BadAPIResponse(500, "Page count must be an integer")))
+      case DataModelFields.pageCount =>
+        if (isIntegerString(newValue)) {
+          collection.updateOne(Filters.equal("_id", id), Updates.set("pageCount", newValue.toInt)).toFuture().map{
+            updateResult =>
+              if (updateResult.getMatchedCount == 0) Left(APIError.BadAPIResponse(404, "Book not found"))
+              else Right(updateResult)
+          }.recover {
+            case e: Exception => Left(APIError.BadAPIResponse(500, s"Unable to update book: ${e.getMessage}"))
+          }
         } else {
-          try{
-            collection.updateOne(Filters.equal("_id", id), Updates.set(field, newValue.toInt)).toFuture().map{
-              updateResult =>
-                if (updateResult.getMatchedCount == 0) Left(APIError.BadAPIResponse(404, "Book not found"))
-                else Right(updateResult)
-            }
-          }
-          catch {
-            case e: Exception => Future(Left(APIError.BadAPIResponse(500, "Unable to update book")))
-          }
+          Future(Left(APIError.BadAPIResponse(500, "Page count must be an integer")))
         }
-      case _ => Future(Left(APIError.BadAPIResponse(500, "Invalid field to update")))
+      case DataModelFields._id => Future(Left(APIError.BadAPIResponse(500, "Cannot update book ID")))
     }
-//    collection.replaceOne(
-//      filter = byID(id),
-//      replacement = book,
-//      options = new ReplaceOptions().upsert(true) //What happens when we set this to false?
-//    ).toFuture()
   }
 
   // delete a document
   def delete(id: String): Future[Either[APIError, result.DeleteResult]] = {
-    try {
-      collection.deleteOne(
-        filter = byID(id)
-      ).toFuture().map {
-        deleteResult =>
-        if (deleteResult.getDeletedCount == 0) Left(APIError.BadAPIResponse(404, "Book not found"))
-        else Right(deleteResult)
+    collection.deleteOne(
+      filter = byID(id)
+    ).toFuture().map { deleteResult =>
+      if (deleteResult.wasAcknowledged) {
+        deleteResult.getDeletedCount match {
+          case 1 => Right(deleteResult)
+          case 0 => Left(APIError.BadAPIResponse(404, "Book not found"))
+          case _ => Left(APIError.BadAPIResponse(500, "Error: Multiple books deleted"))
+        }
+      } else {
+        Left(APIError.BadAPIResponse(500, "Error: Delete not acknowledged"))
       }
-    }
-    catch {
-      case e: Exception => Future(Left(APIError.BadAPIResponse(500, "Unable to delete book")))
+    }.recover {
+      case e: Exception => Left(APIError.BadAPIResponse(500, s"Unable to delete book: ${e.getMessage}"))
     }
   }
 
@@ -170,8 +166,12 @@ trait DataRepositoryTrait {
   def index(): Future[Either[APIError.BadAPIResponse, Seq[DataModel]]]
   def create(book: DataModel): Future[Either[APIError.BadAPIResponse, DataModel]]
   def read(id: String): Future[Either[APIError, DataModel]]
-  def readBySpecifiedField(field: String, value: String): Future[Either[APIError, Seq[DataModel]]]
+  def readBySpecifiedField(field: DataModelFields.Value, value: String): Future[Either[APIError, Seq[DataModel]]]
   def update(id: String, book: DataModel): Future[Either[APIError, result.UpdateResult]]
-  def updateWithValue(id: String, field: String, newValue: String): Future[Either[APIError, result.UpdateResult]]
+  def updateWithValue(id: String, field: DataModelFields.Value, newValue: String): Future[Either[APIError, result.UpdateResult]]
   def delete(id: String): Future[Either[APIError, result.DeleteResult]]
+}
+
+object DataModelFields extends Enumeration {
+  val _id, name, description, pageCount = Value
 }
