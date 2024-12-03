@@ -77,13 +77,13 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
       contentAsJson(createdResult).as[DataModel] shouldBe dataModel
     }
 
-    "return a BadRequest if the book ID is already in the database" in {
+    "return an InternalServerError if the book ID is already in the database" in {
       val request: FakeRequest[JsValue] = buildPost("/api").withBody[JsValue](Json.toJson(dataModel))
       val createdResult: Future[Result] = TestApplicationController.create()(request)
 
       val duplicateRequest: FakeRequest[JsValue] = buildPost("/api").withBody[JsValue](Json.toJson(dataModel))
       val duplicateResult: Future[Result] = TestApplicationController.create()(duplicateRequest)
-      status(duplicateResult) shouldBe Status.BAD_REQUEST
+      status(duplicateResult) shouldBe Status.INTERNAL_SERVER_ERROR
       contentAsString(duplicateResult) shouldBe "Bad response from upstream; got status: 500, and got reason: Book already exists in database"
     }
 
@@ -147,7 +147,7 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
     "return a BadRequest if an invalid field is specified" in {
       val readResult: Future[Result] = TestApplicationController.readBySpecifiedField("bad", "qqq")(FakeRequest())
       status(readResult) shouldBe Status.BAD_REQUEST
-      contentAsString(readResult) shouldBe "Bad response from upstream; got status: 500, and got reason: Invalid field to search"
+      contentAsString(readResult) shouldBe "Bad response from upstream; got status: 400, and got reason: Invalid field to search"
     }
   }
 
@@ -179,10 +179,10 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
 //      status(updateResult) shouldBe Status.ACCEPTED
 //      contentAsJson(updateResult).as[DataModel] shouldBe newDataModel
 //    }
-    "return a BadRequest if the user could not be found" in { // upsert(false)
+    "return a NotFound if the book could not be found" in { // upsert(false)
       val updateRequest: FakeRequest[JsValue] = buildPost("/api/${dataModel._id}").withBody[JsValue](Json.toJson(newDataModel))
       val updateResult = TestApplicationController.update("abcd")(updateRequest)
-      status(updateResult) shouldBe Status.BAD_REQUEST
+      status(updateResult) shouldBe Status.NOT_FOUND
       contentAsString(updateResult) shouldBe "Bad response from upstream; got status: 404, and got reason: Book not found"
 
       // check that database is still empty
@@ -217,7 +217,7 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
 
       val readResult: Future[Result] = TestApplicationController.updateWithValue("abcd", "bad", "qqq")(FakeRequest())
       status(readResult) shouldBe Status.BAD_REQUEST
-      contentAsString(readResult) shouldBe "Bad response from upstream; got status: 500, and got reason: Invalid field to update"
+      contentAsString(readResult) shouldBe "Bad response from upstream; got status: 400, and got reason: Invalid field to update"
     }
 
     "return a BadRequest if page count is updated with a non-integer value" in {
@@ -226,15 +226,15 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
 
       val readResult: Future[Result] = TestApplicationController.updateWithValue("abcd", "pageCount", "1xx")(FakeRequest())
       status(readResult) shouldBe Status.BAD_REQUEST
-      contentAsString(readResult) shouldBe "Bad response from upstream; got status: 500, and got reason: Page count must be an integer"
+      contentAsString(readResult) shouldBe "Bad response from upstream; got status: 400, and got reason: Page count must be an integer"
     }
 
-    "return a BadRequest if the book does not exist in the database" in {
+    "return a NotFound if the book does not exist in the database" in {
       val request: FakeRequest[JsValue] = buildPost("/api").withBody[JsValue](Json.toJson(dataModel))
       val createdResult: Future[Result] = TestApplicationController.create()(request)
 
       val readResult: Future[Result] = TestApplicationController.updateWithValue("aaaa", "pageCount", "100")(FakeRequest())
-      status(readResult) shouldBe Status.BAD_REQUEST
+      status(readResult) shouldBe Status.NOT_FOUND
       contentAsString(readResult) shouldBe "Bad response from upstream; got status: 404, and got reason: Book not found"
     }
   }
@@ -267,9 +267,9 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
 //      contentAsJson(indexResult).as[Seq[DataModel]] shouldBe Seq(dataModel)
 //    }
 
-    "return a BadRequest if the book could not be found" in {
+    "return a NotFound if the book could not be found" in {
       val deleteResult: Future[Result] = TestApplicationController.delete("aaaa")(FakeRequest())
-      status(deleteResult) shouldBe Status.BAD_REQUEST
+      status(deleteResult) shouldBe Status.NOT_FOUND
       contentAsString(deleteResult) shouldBe "Bad response from upstream; got status: 404, and got reason: Book not found"
     }
   }
@@ -311,7 +311,7 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
         .once()
 
       val extractionResult: Future[Result] = TestApplicationController.getGoogleBookList(search = "", term = "")(FakeRequest())
-      status(extractionResult) shouldBe BAD_REQUEST
+      status(extractionResult) shouldBe INTERNAL_SERVER_ERROR
       contentAsString(extractionResult) shouldBe "Bad response from upstream; got status: 500, and got reason: Could not connect"
     }
   }
@@ -543,7 +543,7 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
       contentAsString(addBookResult) should include ("test name")
     }
 
-    "return a BadRequest if the book ID is already in the database" in {
+    "return an InternalServerError if the book ID is already in the database" in {
       val request: FakeRequest[JsValue] = buildPost("/api").withBody[JsValue](Json.toJson(dataModel))
       val createdResult: Future[Result] = TestApplicationController.create()(request)
 
@@ -554,8 +554,8 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
         "pageCount" -> "100"
       ) // .withCRSFToken not needed?
       val addBookResult: Future[Result] = TestApplicationController.addFromSearch()(addBookRequest)
-      status(addBookResult) shouldBe Status.BAD_REQUEST
-      contentAsString(addBookResult) should include ("Book ID already exists in database")
+      status(addBookResult) shouldBe Status.INTERNAL_SERVER_ERROR
+      contentAsString(addBookResult) should include ("Book already exists in database")
     }
   }
 
@@ -583,7 +583,7 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
       status(addBookResult) shouldBe Status.BAD_REQUEST
     }
 
-    "return a BadRequest if the book ID is already in the database" in {
+    "return an InternalServerError if the book ID is already in the database" in {
       val request: FakeRequest[JsValue] = buildPost("/api").withBody[JsValue](Json.toJson(dataModel))
       val createdResult: Future[Result] = TestApplicationController.create()(request)
 
@@ -594,8 +594,8 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
         "pageCount" -> "100"
       ) // .withCRSFToken not needed?
       val addBookResult: Future[Result] = TestApplicationController.addBookForm()(addBookRequest)
-      status(addBookResult) shouldBe Status.BAD_REQUEST
-      contentAsString(addBookResult) should include ("Book ID already exists in database")
+      status(addBookResult) shouldBe Status.INTERNAL_SERVER_ERROR
+      contentAsString(addBookResult) should include ("Book already exists in database")
     }
   }
 
@@ -640,10 +640,10 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
       contentAsString(deleteResult) should include ("Delete successful!")
     }
 
-    "return a BadRequest if the book could not be found" in {
+    "return a NotFound if the book could not be found" in {
       val deleteResult: Future[Result] = TestApplicationController.deleteBook("aaaa")(FakeRequest())
-      status(deleteResult) shouldBe Status.BAD_REQUEST
-      contentAsString(deleteResult) should include ("Book not found in database")
+      status(deleteResult) shouldBe Status.NOT_FOUND
+      contentAsString(deleteResult) should include ("Book not found")
     }
   }
 

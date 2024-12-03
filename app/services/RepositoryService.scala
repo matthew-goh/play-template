@@ -27,26 +27,23 @@ class RepositoryService @Inject()(repositoryTrait: DataRepositoryTrait)
 //    val description: String = reqBody.flatMap(_.get("description").flatMap(_.headOption)).getOrElse("")
 //    val pageCount: Int = reqBody.flatMap(_.get("pageCount").flatMap(_.headOption)).getOrElse("0").toInt
 
-    val missingErrorText = "Missing required value"
-    val invalidTypeErrorText = "Invalid data type"
-    val reqBodyValuesEither: Either[String, (String, String, Int)] = for {
-      // if any required value is missing, the result is Left(missingErrorText)
-      id <- reqBody.flatMap(_.get("_id").flatMap(_.headOption)).toRight(missingErrorText)
-      name <- reqBody.flatMap(_.get("name").flatMap(_.headOption)).toRight(missingErrorText)
-      pageCountStr <- reqBody.flatMap(_.get("pageCount").flatMap(_.headOption)).toRight(missingErrorText)
-      // if any data type is invalid, the result is Left(invalidTypeErrorText)
-      pageCount <- Try(pageCountStr.toInt).toOption.toRight(invalidTypeErrorText)
-    } yield (id, name, pageCount)
+    val missingError = APIError.BadAPIResponse(400, "Missing required value")
+    val invalidTypeError = APIError.BadAPIResponse(400, "Invalid data type")
 
     // description can be blank
     val description: String = reqBody.flatMap(_.get("description").flatMap(_.headOption)).getOrElse("")
+    val reqBodyValuesEither: Either[APIError.BadAPIResponse, DataModel] = for {
+      // if any required value is missing, the result is Left(missingError)
+      id <- reqBody.flatMap(_.get("_id").flatMap(_.headOption)).toRight(missingError)
+      name <- reqBody.flatMap(_.get("name").flatMap(_.headOption)).toRight(missingError)
+      pageCountStr <- reqBody.flatMap(_.get("pageCount").flatMap(_.headOption)).toRight(missingError)
+      // if any data type is invalid, the result is Left(invalidTypeError)
+      pageCount <- Try(pageCountStr.toInt).toOption.toRight(invalidTypeError)
+    } yield DataModel(id, name, description, pageCount)
 
     reqBodyValuesEither match {
-      case Right((id, name, pageCount)) => {
-        val book = DataModel(id, name, description, pageCount)
-        repositoryTrait.create(book)
-      }
-      case Left(errorText) => Future(Left(APIError.BadAPIResponse(400, errorText)))
+      case Right(book) => repositoryTrait.create(book)
+      case Left(error) => Future(Left(error))
     }
   }
 
@@ -59,7 +56,7 @@ class RepositoryService @Inject()(repositoryTrait: DataRepositoryTrait)
     val fieldTry: Try[DataModelFields.Value] = Try(DataModelFields.withName(field))
     fieldTry match {
       case Success(fieldName) => repositoryTrait.readBySpecifiedField(fieldName, value)
-      case Failure(e) => Future(Left(APIError.BadAPIResponse(500, "Invalid field to search")))
+      case Failure(e) => Future(Left(APIError.BadAPIResponse(400, "Invalid field to search")))
     }
   }
 
@@ -72,7 +69,7 @@ class RepositoryService @Inject()(repositoryTrait: DataRepositoryTrait)
     val fieldTry: Try[DataModelFields.Value] = Try(DataModelFields.withName(field))
     fieldTry match {
       case Success(fieldName) => repositoryTrait.updateWithValue(id, fieldName, newValue)
-      case Failure(e) => Future(Left(APIError.BadAPIResponse(500, "Invalid field to update")))
+      case Failure(e) => Future(Left(APIError.BadAPIResponse(400, "Invalid field to update")))
     }
   }
 

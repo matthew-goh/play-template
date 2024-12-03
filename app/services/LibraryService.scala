@@ -3,7 +3,6 @@ package services
 import cats.data.EitherT
 import connectors.LibraryConnector
 import models.{APIError, Book, Collection, DataModel, VolumeInfo}
-import play.api.libs.json.JsValue
 
 import javax.inject._
 import scala.concurrent.{ExecutionContext, Future}

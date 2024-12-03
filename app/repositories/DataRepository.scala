@@ -33,7 +33,7 @@ class DataRepository @Inject()(mongoComponent: MongoComponent)
   def index(): Future[Either[APIError.BadAPIResponse, Seq[DataModel]]]  = {
     collection.find().toFuture().map{ books: Seq[DataModel] => Right(books) }
       .recover{
-        case e: Exception => Left(APIError.BadAPIResponse(404, "Database collection not found"))
+        case e: Exception => Left(APIError.BadAPIResponse(500, s"Unable to find database collection: ${e.getMessage}"))
       }
   }
 
@@ -83,7 +83,7 @@ class DataRepository @Inject()(mongoComponent: MongoComponent)
             case e: Exception => Left(APIError.BadAPIResponse(500, s"Unable to search for books: ${e.getMessage}"))
           }
       }
-      case DataModelFields.pageCount => Future(Left(APIError.BadAPIResponse(500, "Cannot search page count")))
+      case DataModelFields.pageCount => Future.successful(Left(APIError.BadAPIResponse(400, "Cannot search page count")))
     }
   }
 
@@ -131,9 +131,9 @@ class DataRepository @Inject()(mongoComponent: MongoComponent)
             case e: Exception => Left(APIError.BadAPIResponse(500, s"Unable to update book: ${e.getMessage}"))
           }
         } else {
-          Future(Left(APIError.BadAPIResponse(500, "Page count must be an integer")))
+          Future.successful(Left(APIError.BadAPIResponse(400, "Page count must be an integer")))
         }
-      case DataModelFields._id => Future(Left(APIError.BadAPIResponse(500, "Cannot update book ID")))
+      case DataModelFields._id => Future.successful(Left(APIError.BadAPIResponse(400, "Cannot update book ID")))
     }
   }
 
