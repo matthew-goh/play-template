@@ -17,6 +17,10 @@ class ApplicationController @Inject()(repoService: RepositoryService, service: L
     CSRF.getToken
   }
 
+  def invalidRoute(path: String): Action[AnyContent] = Action.async {_ =>
+    Future.successful(NotFound(views.html.pagenotfound(path)))
+  }
+
   def listAllBooks(): Action[AnyContent] = Action.async {implicit request =>
     repoService.index().map{ // dataRepository.index() is a Future[Either[APIError.BadAPIResponse, Seq[DataModel]]]
       case Right(bookList: Seq[DataModel]) => Ok(views.html.listing(bookList))

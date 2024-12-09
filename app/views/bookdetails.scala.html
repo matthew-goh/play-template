@@ -8,12 +8,14 @@
   <p>Description: @bookData.description</p>
   <p>Page count: @bookData.pageCount</p>
 
-  <form action="@routes.ApplicationController.updateBook(bookData._id)" method="GET" class="button-form">
-    <button type="submit">Update</button>
-  </form>
-  <form action="@routes.ApplicationController.deleteBook(bookData._id)" method="GET" class="button-form">
-    <button type="submit">Delete</button>
-  </form>
+  @if(!(bookData._id == "Not found" && bookData.name == "N/A")) {
+    <form action="@routes.ApplicationController.updateBook(bookData._id)" method="GET" class="button-form">
+      <button type="submit">Update</button>
+    </form>
+    <form action="@routes.ApplicationController.deleteBook(bookData._id)" method="GET" class="button-form">
+      <button type="submit">Delete</button>
+    </form>
+  }
 
   <p><a href="@routes.HomeController.index()"> Back </a></p>
 }
