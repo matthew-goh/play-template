@@ -59,11 +59,11 @@ class RepositoryServiceSpec extends BaseSpec with MockFactory with ScalaFutures 
     "return an error" in {
       (mockRepoTrait.index _)
         .expects()
-        .returning(Future(Left(APIError.BadAPIResponse(404, "Database collection not found"))))
+        .returning(Future(Left(APIError.BadAPIResponse(500, "Unable to find database collection"))))
         .once()
 
         whenReady(testRepoService.index()) { result =>
-        result shouldBe Left(APIError.BadAPIResponse(404, "Database collection not found"))
+        result shouldBe Left(APIError.BadAPIResponse(500, "Unable to find database collection"))
       }
     }
   }
@@ -206,7 +206,7 @@ class RepositoryServiceSpec extends BaseSpec with MockFactory with ScalaFutures 
 
     "return an error if an invalid field is provided" in {
       whenReady(testRepoService.readBySpecifiedField("bad field", "123")) { result =>
-        result shouldBe Left(APIError.BadAPIResponse(500, "Invalid field to search"))
+        result shouldBe Left(APIError.BadAPIResponse(400, "Invalid field to search"))
       }
     }
   }
@@ -250,17 +250,17 @@ class RepositoryServiceSpec extends BaseSpec with MockFactory with ScalaFutures 
     "return an error from DataRepository" in {
       (mockRepoTrait.updateWithValue(_: String, _: DataModelFields.Value, _: String))
         .expects("abcd", DataModelFields._id, "new")
-        .returning(Future(Left(APIError.BadAPIResponse(500, "Cannot update book ID"))))
+        .returning(Future(Left(APIError.BadAPIResponse(400, "Cannot update book ID"))))
         .once()
 
       whenReady(testRepoService.updateWithValue("abcd", "_id", "new")) { result =>
-        result shouldBe Left(APIError.BadAPIResponse(500, "Cannot update book ID"))
+        result shouldBe Left(APIError.BadAPIResponse(400, "Cannot update book ID"))
       }
     }
 
     "return an error if an invalid field is provided" in {
       whenReady(testRepoService.updateWithValue("abcd", "pgCount", "250")) { result =>
-        result shouldBe Left(APIError.BadAPIResponse(500, "Invalid field to update"))
+        result shouldBe Left(APIError.BadAPIResponse(400, "Invalid field to update"))
       }
     }
   }

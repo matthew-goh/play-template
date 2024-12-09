@@ -14,8 +14,7 @@ import play.api.mvc._
 import play.api.test.Helpers._
 import services.LibraryService
 
-import scala.concurrent.{Await, ExecutionContext, Future}
-import scala.concurrent.duration._
+import scala.concurrent.{ExecutionContext, Future}
 
 class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory {
   val mockLibraryService: LibraryService = mock[LibraryService]
@@ -45,253 +44,565 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
     289
   )
 
-  "ApplicationController .index()" should {
+  ///// METHODS CALLED BY FRONTEND /////
+  "ApplicationController .listAllBooks()" should {
     "list all books in the database" in {
-      beforeEach()
-      // need to use .create before we can find something in our repository
       val request: FakeRequest[JsValue] = buildPost("/api").withBody[JsValue](Json.toJson(dataModel))
       val createdResult: Future[Result] = TestApplicationController.create()(request)
+      status(createdResult) shouldBe Status.CREATED
+      val request2: FakeRequest[JsValue] = buildPost("/api").withBody[JsValue](Json.toJson(dataModel2))
+      val createdResult2: Future[Result] = TestApplicationController.create()(request2)
+      status(createdResult2) shouldBe Status.CREATED
+
+      val listingResult: Future[Result] = TestApplicationController.listAllBooks()(FakeRequest())
+      status(listingResult) shouldBe Status.OK
+      contentAsString(listingResult) should include ("test description")
+      contentAsString(listingResult) should include ("The Decagon House Murders")
+    }
+
+    "show 'No books found' if the database is empty" in {
+      val listingResult: Future[Result] = TestApplicationController.listAllBooks()(FakeRequest())
+      status(listingResult) shouldBe Status.OK
+      contentAsString(listingResult) should include ("No books found")
+    }
+  }
+
+  "ApplicationController .showBookDetails()" should {
+    "display the specified book's details" in {
+      val request: FakeRequest[JsValue] = buildPost("/api").withBody[JsValue](Json.toJson(dataModel))
+      val createdResult: Future[Result] = TestApplicationController.create()(request)
+      status(createdResult) shouldBe Status.CREATED
+
+      val searchResult: Future[Result] = TestApplicationController.showBookDetails("abcd")(FakeRequest())
+      status(searchResult) shouldBe Status.OK
+      contentAsString(searchResult) should include ("test name")
+    }
+
+    "return a NotFound if the book is not in the database" in {
+      val searchResult: Future[Result] = TestApplicationController.showBookDetails("abcd")(FakeRequest())
+      status(searchResult) shouldBe Status.NOT_FOUND
+      contentAsString(searchResult) should include ("Not found")
+    }
+  }
+
+  "ApplicationController .searchBookByID()" should {
+    "redirect to book details page when an ID is searched" in {
+      val searchRequest: FakeRequest[AnyContentAsFormUrlEncoded] = buildPost("/searchid").withFormUrlEncodedBody(
+        "bookID" -> "abcd"
+      )
+      val searchResult: Future[Result] = TestApplicationController.searchBookByID()(searchRequest)
+      status(searchResult) shouldBe Status.SEE_OTHER
+      redirectLocation(searchResult) shouldBe Some("/bookdetails/abcd")
+    }
+
+    "return a BadRequest if ID is blank" in {
+      val searchRequest: FakeRequest[AnyContentAsFormUrlEncoded] = buildPost("/searchid").withFormUrlEncodedBody(
+        "bookID" -> ""
+      )
+      val searchResult: Future[Result] = TestApplicationController.searchBookByID()(searchRequest)
+      status(searchResult) shouldBe Status.BAD_REQUEST
+      contentAsString(searchResult) should include ("No ID provided")
+    }
+  }
+
+  "ApplicationController .searchBookByTitle()" should {
+    "list the matching books" in {
+      val request: FakeRequest[JsValue] = buildPost("/api").withBody[JsValue](Json.toJson(dataModel))
+      val createdResult: Result = await(TestApplicationController.create()(request))
+      createdResult.header.status shouldBe Status.CREATED
+//      val createdResult: Future[Result] = TestApplicationController.create()(request)
+//      status(createdResult) shouldBe Status.CREATED
+      val request2: FakeRequest[JsValue] = buildPost("/api").withBody[JsValue](Json.toJson(dataModel2))
+      val createdResult2: Result = await(TestApplicationController.create()(request2))
+      createdResult2.header.status shouldBe Status.CREATED
+//      val createdResult2: Future[Result] = TestApplicationController.create()(request2)
+//      status(createdResult2) shouldBe Status.CREATED
+
+      val searchRequest: FakeRequest[AnyContentAsFormUrlEncoded] = buildPost("/searchtitle").withFormUrlEncodedBody(
+        "title" -> "test"
+      ) // .withCRSFToken not needed?
+      val searchResult: Future[Result] = TestApplicationController.searchBookByTitle()(searchRequest)
+      status(searchResult) shouldBe Status.OK
+      contentAsString(searchResult) should include ("test name")
+      contentAsString(searchResult) shouldNot include ("new name")
+    }
+
+    "show 'No books found' if the database is empty" in {
+      val searchRequest: FakeRequest[AnyContentAsFormUrlEncoded] = buildPost("/searchtitle").withFormUrlEncodedBody(
+        "title" -> " name"
+      ) // .withCRSFToken not needed?
+      val searchResult: Future[Result] = TestApplicationController.searchBookByTitle()(searchRequest)
+      status(searchResult) shouldBe Status.OK
+      contentAsString(searchResult) should include ("No books found")
+    }
+
+    "return a BadRequest if title is blank" in {
+      val searchRequest: FakeRequest[AnyContentAsFormUrlEncoded] = buildPost("/searchid").withFormUrlEncodedBody(
+        "title" -> ""
+      )
+      val searchResult: Future[Result] = TestApplicationController.searchBookByTitle()(searchRequest)
+      status(searchResult) shouldBe Status.BAD_REQUEST
+      contentAsString(searchResult) should include ("No title provided")
+    }
+  }
+
+  "ApplicationController .searchGoogleAndDisplay()" should {
+    "list the API search results without adding books to the database" in {
+      val reqBody = Some(Map(
+        "search" -> List("something"),
+        "keyword" -> List("inauthor"),
+        "term_value" -> List("something")
+      ))
+
+      (mockLibraryService.getGoogleCollection(_: Option[Map[String, Seq[String]]])(_: ExecutionContext))
+        .expects(reqBody, *)
+        .returning(EitherT.rightT(LibraryServiceSpec.testAPICollection))
+        .once()
+
+      (mockLibraryService.extractBooksFromCollection(_: Collection))
+        .expects(LibraryServiceSpec.testAPICollection)
+        .returning(Seq(dataModel, dataModel2))
+        .once()
+
+      val searchRequest: FakeRequest[AnyContentAsFormUrlEncoded] = buildPost("/searchgoogle").withFormUrlEncodedBody(
+        "search" -> "something",
+        "keyword" -> "inauthor",
+        "term_value" -> "something"
+      ) // .withCRSFToken not needed?
+      val searchResult: Future[Result] = TestApplicationController.searchGoogleAndDisplay()(searchRequest)
+      status(searchResult) shouldBe Status.OK
+      contentAsString(searchResult) should include ("test description")
+      contentAsString(searchResult) should include ("The Decagon House Murders")
+      contentAsString(searchResult) should include ("Add to database")
 
       val indexResult: Future[Result] = TestApplicationController.index()(FakeRequest())
       status(indexResult) shouldBe Status.OK
-      // same as status(indexResult) shouldBe 501
-      contentAsJson(indexResult).as[Seq[DataModel]] shouldBe Seq(dataModel)
-      afterEach()
+      contentAsJson(indexResult).as[Seq[DataModel]] shouldBe Seq() // database should be empty
     }
 
-    // CAN THIS BE TESTED?
-//    "return an error if the database could not be found" in {
-//      beforeEach()
-//      val indexResult: Future[Result] = TestApplicationController.index()(FakeRequest())
-//      println(contentAsJson(indexResult))
-//      status(indexResult) shouldBe 404
-//      println(status(indexResult))
-//      afterEach()
-//    }
+    "list the API search results and add the books to the database" in {
+      val reqBody = Some(Map(
+        "search" -> List("something"),
+        "keyword" -> List("inauthor"),
+        "term_value" -> List("something"),
+        "add_to_database" -> List("true")
+      ))
+
+      (mockLibraryService.getGoogleCollection(_: Option[Map[String, Seq[String]]])(_: ExecutionContext))
+        .expects(reqBody, *)
+        .returning(EitherT.rightT(LibraryServiceSpec.testAPICollection))
+        .once()
+
+      (mockLibraryService.extractBooksFromCollection(_: Collection))
+        .expects(LibraryServiceSpec.testAPICollection)
+        .returning(Seq(dataModel, dataModel2))
+        .once()
+
+      val searchRequest: FakeRequest[AnyContentAsFormUrlEncoded] = buildPost("/searchgoogle").withFormUrlEncodedBody(
+        "search" -> "something",
+        "keyword" -> "inauthor",
+        "term_value" -> "something",
+        "add_to_database" -> "true"
+      ) // .withCRSFToken not needed?
+      val searchResult: Future[Result] = TestApplicationController.searchGoogleAndDisplay()(searchRequest)
+      // allow time to add books to database
+      whenReady(searchResult) { _ =>
+        status(searchResult) shouldBe Status.OK
+        contentAsString(searchResult) should include ("test description")
+        contentAsString(searchResult) should include ("The Decagon House Murders")
+        contentAsString(searchResult) shouldNot include ("Add to database")
+      }
+      val indexResult: Future[Result] = TestApplicationController.index()(FakeRequest())
+      status(indexResult) shouldBe Status.OK
+      contentAsJson(indexResult).as[Seq[DataModel]] should contain theSameElementsAs Seq(dataModel, dataModel2) // database should contain the 2 books
+    }
+
+    "show 'No books found' if there are no search results" in {
+      val reqBody = Some(Map(
+        "search" -> List("something"),
+        "keyword" -> List("inauthor"),
+        "term_value" -> List("something")
+      ))
+
+      (mockLibraryService.getGoogleCollection(_: Option[Map[String, Seq[String]]])(_: ExecutionContext))
+        .expects(reqBody, *)
+        .returning(EitherT.rightT(LibraryServiceSpec.testAPICollection))
+        .once()
+
+      (mockLibraryService.extractBooksFromCollection(_: Collection))
+        .expects(*)
+        .returning(Seq())
+        .once()
+
+      val searchRequest: FakeRequest[AnyContentAsFormUrlEncoded] = buildPost("/searchgoogle").withFormUrlEncodedBody(
+        "search" -> "something",
+        "keyword" -> "inauthor",
+        "term_value" -> "something"
+      ) // .withCRSFToken not needed?
+      val searchResult: Future[Result] = TestApplicationController.searchGoogleAndDisplay()(searchRequest)
+      status(searchResult) shouldBe Status.OK
+      contentAsString(searchResult) should include ("No books found")
+    }
+
+    "return a BadRequest if keyword is blank" in {
+      val reqBody = Some(Map(
+        "search" -> List("something"),
+        "keyword" -> List(""),
+        "term_value" -> List("something")
+      ))
+
+      (mockLibraryService.getGoogleCollection(_: Option[Map[String, Seq[String]]])(_: ExecutionContext))
+        .expects(reqBody, *)
+        .returning(EitherT.leftT(APIError.BadAPIResponse(400, "Keyword missing from search")))
+        .once()
+
+      val searchRequest: FakeRequest[AnyContentAsFormUrlEncoded] = buildPost("/searchgoogle").withFormUrlEncodedBody(
+        "search" -> "something",
+        "keyword" -> "",
+        "term_value" -> "something"
+      ) // .withCRSFToken not needed?
+      val searchResult: Future[Result] = TestApplicationController.searchGoogleAndDisplay()(searchRequest)
+      status(searchResult) shouldBe Status.BAD_REQUEST
+      contentAsString(searchResult) should include ("Keyword missing from search")
+    }
+  }
+
+  "ApplicationController .addFromSearch()" should {
+    "add a book to the database" in {
+      val addBookRequest: FakeRequest[AnyContentAsFormUrlEncoded] = buildPost("/addfromsearch").withFormUrlEncodedBody(
+        "_id" -> "abcd",
+        "name" -> "test name",
+        "description" -> "test description",
+        "pageCount" -> "100"
+      ) // .withCRSFToken not needed?
+      val addBookResult: Future[Result] = TestApplicationController.addFromSearch()(addBookRequest)
+      status(addBookResult) shouldBe Status.OK
+      contentAsString(addBookResult) should include ("test name")
+    }
+
+    "return an InternalServerError if the book ID is already in the database" in {
+      val request: FakeRequest[JsValue] = buildPost("/api").withBody[JsValue](Json.toJson(dataModel))
+      val createdResult: Future[Result] = TestApplicationController.create()(request)
+
+      val addBookRequest: FakeRequest[AnyContentAsFormUrlEncoded] = buildPost("/addfromsearch").withFormUrlEncodedBody(
+        "_id" -> "abcd",
+        "name" -> "test name",
+        "description" -> "test description",
+        "pageCount" -> "100"
+      ) // .withCRSFToken not needed?
+      val addBookResult: Future[Result] = TestApplicationController.addFromSearch()(addBookRequest)
+      status(addBookResult) shouldBe Status.INTERNAL_SERVER_ERROR
+      contentAsString(addBookResult) should include ("Book already exists in database")
+    }
+  }
+
+  "ApplicationController .addBookForm()" should {
+    "add a book to the database" in {
+      val addBookRequest: FakeRequest[AnyContentAsFormUrlEncoded] = buildPost("/add/form").withFormUrlEncodedBody(
+        "_id" -> "abcd",
+        "name" -> "test name",
+        "description" -> "test description",
+        "pageCount" -> "100"
+      ) // .withCRSFToken not needed?
+      val addBookResult: Future[Result] = TestApplicationController.addBookForm()(addBookRequest)
+      status(addBookResult) shouldBe Status.OK
+      // println(contentAsString(addBookResult))
+    }
+
+    "detect a form with errors" in {
+      val addBookRequest: FakeRequest[AnyContentAsFormUrlEncoded] = buildPost("/add/form").withFormUrlEncodedBody(
+        "_id" -> "abcd",
+        "name" -> "",
+        "description" -> "test description",
+        "pageCount" -> "100"
+      ) // .withCRSFToken not needed?
+      val addBookResult: Future[Result] = TestApplicationController.addBookForm()(addBookRequest)
+      status(addBookResult) shouldBe Status.BAD_REQUEST
+    }
+
+    "return an InternalServerError if the book ID is already in the database" in {
+      val request: FakeRequest[JsValue] = buildPost("/api").withBody[JsValue](Json.toJson(dataModel))
+      val createdResult: Future[Result] = TestApplicationController.create()(request)
+      status(createdResult) shouldBe Status.CREATED
+
+      val addBookRequest: FakeRequest[AnyContentAsFormUrlEncoded] = buildPost("/add/form").withFormUrlEncodedBody(
+        "_id" -> "abcd",
+        "name" -> "test name",
+        "description" -> "test description",
+        "pageCount" -> "100"
+      ) // .withCRSFToken not needed?
+      val addBookResult: Future[Result] = TestApplicationController.addBookForm()(addBookRequest)
+      status(addBookResult) shouldBe Status.INTERNAL_SERVER_ERROR
+      contentAsString(addBookResult) should include ("Book already exists in database")
+    }
+  }
+
+  "ApplicationController .updateBookForm()" should {
+    "update a book in the database" in {
+      val request: FakeRequest[JsValue] = buildPost("/api").withBody[JsValue](Json.toJson(dataModel))
+      val createdResult: Future[Result] = TestApplicationController.create()(request)
+      status(createdResult) shouldBe Status.CREATED
+
+      val updateBookRequest: FakeRequest[AnyContentAsFormUrlEncoded] = buildPost("/update/form").withFormUrlEncodedBody(
+        "_id" -> "abcd",
+        "name" -> "new name",
+        "description" -> "new description",
+        "pageCount" -> "200"
+      ) // .withCRSFToken not needed?
+      val updateBookResult: Future[Result] = TestApplicationController.updateBookForm()(updateBookRequest)
+      status(updateBookResult) shouldBe Status.OK
+      contentAsString(updateBookResult) should include ("new name")
+    }
+
+    "detect a form with errors" in {
+      val request: FakeRequest[JsValue] = buildPost("/api").withBody[JsValue](Json.toJson(dataModel))
+      val createdResult: Future[Result] = TestApplicationController.create()(request)
+      status(createdResult) shouldBe Status.CREATED
+
+      val updateBookRequest: FakeRequest[AnyContentAsFormUrlEncoded] = buildPost("/add/form").withFormUrlEncodedBody(
+        "_id" -> "abcd",
+        "name" -> "new name",
+        "description" -> "new description",
+        "pageCount" -> "aaa"
+      ) // .withCRSFToken not needed?
+      val updateBookResult: Future[Result] = TestApplicationController.updateBookForm()(updateBookRequest)
+      status(updateBookResult) shouldBe Status.BAD_REQUEST
+    }
+  }
+
+  "ApplicationController .deleteBook()" should {
+    "delete a book from the database" in {
+      val request: FakeRequest[JsValue] = buildPost("/api").withBody[JsValue](Json.toJson(dataModel))
+      val createdResult: Future[Result] = TestApplicationController.create()(request)
+      status(createdResult) shouldBe Status.CREATED
+
+      val deleteResult: Future[Result] = TestApplicationController.deleteBook("abcd")(FakeRequest())
+      status(deleteResult) shouldBe Status.OK
+      contentAsString(deleteResult) should include ("Delete successful!")
+    }
+
+    "return a NotFound if the book could not be found" in {
+      val deleteResult: Future[Result] = TestApplicationController.deleteBook("aaaa")(FakeRequest())
+      status(deleteResult) shouldBe Status.NOT_FOUND
+      contentAsString(deleteResult) should include ("Book not found")
+    }
+  }
+
+  /// API METHODS WITHOUT FRONTEND ///
+  "ApplicationController .index()" should {
+    "list all books in the database" in {
+      // need to use .create before we can find something in our repository
+      val request: FakeRequest[JsValue] = buildPost("/api").withBody[JsValue](Json.toJson(dataModel))
+      val createdResult: Future[Result] = TestApplicationController.create()(request)
+      status(createdResult) shouldBe Status.CREATED
+
+      val indexResult: Future[Result] = TestApplicationController.index()(FakeRequest())
+      status(indexResult) shouldBe Status.OK
+      // same as status(indexResult) shouldBe 200
+      contentAsJson(indexResult).as[Seq[DataModel]] shouldBe Seq(dataModel)
+    }
   }
 
   "ApplicationController .create()" should {
     "create a book in the database" in {
-      beforeEach()
       val request: FakeRequest[JsValue] = buildPost("/api").withBody[JsValue](Json.toJson(dataModel))
 
-//      val createdResultAwait: Result = Await.result(TestApplicationController.create()(request), 100.milliseconds)
-//      createdResultAwait.header.status shouldBe Status.CREATED
-//      // Extract the response body from the Result
-//      val responseBody: String = createdResultAwait.body match {
-//        case HttpEntity.Strict(data, _) => data.decodeString("UTF-8")
-//        case _                          => throw new IllegalStateException("Unexpected response entity type")
-//      }
-//      // Parse the response body as JSON and cast to DataModel
-//      Json.parse(responseBody).as[DataModel] shouldBe dataModel
+      //      val createdResultAwait: Result = Await.result(TestApplicationController.create()(request), 100.milliseconds)
+      //      createdResultAwait.header.status shouldBe Status.CREATED
+      //      // Extract the response body from the Result
+      //      val responseBody: String = createdResultAwait.body match {
+      //        case HttpEntity.Strict(data, _) => data.decodeString("UTF-8")
+      //        case _                          => throw new IllegalStateException("Unexpected response entity type")
+      //      }
+      //      // Parse the response body as JSON and cast to DataModel
+      //      Json.parse(responseBody).as[DataModel] shouldBe dataModel
 
       val createdResult: Future[Result] = TestApplicationController.create()(request)
       status(createdResult) shouldBe Status.CREATED
       contentAsJson(createdResult).as[DataModel] shouldBe dataModel
-      afterEach()
     }
 
-    "return a BadRequest if the book ID is already in the database" in {
-      beforeEach()
+    "return an InternalServerError if the book ID is already in the database" in {
       val request: FakeRequest[JsValue] = buildPost("/api").withBody[JsValue](Json.toJson(dataModel))
       val createdResult: Future[Result] = TestApplicationController.create()(request)
+      status(createdResult) shouldBe Status.CREATED
 
       val duplicateRequest: FakeRequest[JsValue] = buildPost("/api").withBody[JsValue](Json.toJson(dataModel))
       val duplicateResult: Future[Result] = TestApplicationController.create()(duplicateRequest)
-      status(duplicateResult) shouldBe Status.BAD_REQUEST
+      status(duplicateResult) shouldBe Status.INTERNAL_SERVER_ERROR
       contentAsString(duplicateResult) shouldBe "Bad response from upstream; got status: 500, and got reason: Book already exists in database"
-      afterEach()
     }
 
     "return a BadRequest if the request body could not be parsed into a DataModel" in {
-      beforeEach()
       val request: FakeRequest[JsValue] = buildPost("/api").withBody[JsValue](Json.toJson("abcd"))
       val createdResult: Future[Result] = TestApplicationController.create()(request)
       status(createdResult) shouldBe Status.BAD_REQUEST
       contentAsString(createdResult) shouldBe "Invalid request body"
-      afterEach()
     }
   }
 
   "ApplicationController .read()" should {
     "find a book in the database by id" in {
-      beforeEach()
       // need to use .create before we can find something in our repository
       val request: FakeRequest[JsValue] = buildGet("/api/${dataModel._id}").withBody[JsValue](Json.toJson(dataModel))
       val createdResult: Future[Result] = TestApplicationController.create()(request)
+      status(createdResult) shouldBe Status.CREATED
 
       val readResult: Future[Result] = TestApplicationController.read("abcd")(FakeRequest())
       status(readResult) shouldBe Status.OK
       contentAsJson(readResult).as[DataModel] shouldBe dataModel
       // {"_id":"abcd","name":"test name","description":"test description","pageCount":100}
-      afterEach()
     }
 
     "return a NotFound if the book could not be found" in {
-      beforeEach()
       val readResult: Future[Result] = TestApplicationController.read("aaaa")(FakeRequest())
       status(readResult) shouldBe NOT_FOUND
       contentAsString(readResult) shouldBe "Bad response from upstream; got status: 404, and got reason: Book not found"
-      afterEach()
     }
   }
 
   "ApplicationController .readBySpecificField()" should {
     "find a book in the database by id" in {
-      beforeEach()
       val request: FakeRequest[JsValue] = buildGet("/api/${dataModel._id}").withBody[JsValue](Json.toJson(dataModel))
       val createdResult: Future[Result] = TestApplicationController.create()(request)
+      status(createdResult) shouldBe Status.CREATED
 
       val readResult: Future[Result] = TestApplicationController.readBySpecifiedField("_id", "abcd")(FakeRequest())
       status(readResult) shouldBe Status.OK
       contentAsJson(readResult).as[Seq[DataModel]] shouldBe Seq(dataModel)
-      afterEach()
     }
 
     "find a book in the database by name" in {
-      beforeEach()
       val request: FakeRequest[JsValue] = buildGet("/api/${dataModel._id}").withBody[JsValue](Json.toJson(dataModel))
-      val createdResult: Future[Result] = TestApplicationController.create()(request)
+      val createdResult: Result = await(TestApplicationController.create()(request))
+      createdResult.header.status shouldBe Status.CREATED
+      //      val createdResult: Future[Result] = TestApplicationController.create()(request)
+      //      status(createdResult) shouldBe Status.CREATED
 
-      Thread.sleep(100)
       val readResult: Future[Result] = TestApplicationController.readBySpecifiedField("name", "Test Name")(FakeRequest())
       status(readResult) shouldBe Status.OK
       contentAsJson(readResult).as[Seq[DataModel]] shouldBe Seq(dataModel)
-      afterEach()
     }
 
     "find a book in the database by description" in {
-      beforeEach()
       val request: FakeRequest[JsValue] = buildGet("/api/${dataModel._id}").withBody[JsValue](Json.toJson(dataModel))
-      val createdResult: Future[Result] = TestApplicationController.create()(request)
+      val createdResult: Result = await(TestApplicationController.create()(request))
+      createdResult.header.status shouldBe Status.CREATED
+      //      val createdResult: Future[Result] = TestApplicationController.create()(request)
+      //      status(createdResult) shouldBe Status.CREATED
 
-      Thread.sleep(100)
       val readResult: Future[Result] = TestApplicationController.readBySpecifiedField("description", "test DESCRIPTION")(FakeRequest())
       status(readResult) shouldBe Status.OK
       contentAsJson(readResult).as[Seq[DataModel]] shouldBe Seq(dataModel)
-      afterEach()
     }
 
     "return a BadRequest if an invalid field is specified" in {
-      beforeEach()
       val readResult: Future[Result] = TestApplicationController.readBySpecifiedField("bad", "qqq")(FakeRequest())
       status(readResult) shouldBe Status.BAD_REQUEST
-      contentAsString(readResult) shouldBe "Bad response from upstream; got status: 500, and got reason: Invalid field to search"
-      afterEach()
+      contentAsString(readResult) shouldBe "Bad response from upstream; got status: 400, and got reason: Invalid field to search"
     }
   }
 
   "ApplicationController .update()" should {
     "update a book in the database" in {
-      beforeEach()
       // need to use .create before we can update something in our repository
       val request: FakeRequest[JsValue] = buildPost("/api").withBody[JsValue](Json.toJson(dataModel))
       val createdResult: Future[Result] = TestApplicationController.create()(request)
+      status(createdResult) shouldBe Status.CREATED
 
       val updateRequest: FakeRequest[JsValue] = buildPost("/api/${dataModel._id}").withBody[JsValue](Json.toJson(newDataModel))
       val updateResult = TestApplicationController.update("abcd")(updateRequest)
       status(updateResult) shouldBe Status.ACCEPTED
       contentAsJson(updateResult).as[DataModel] shouldBe newDataModel
-      afterEach()
     }
 
     "return a BadRequest if the if the request body could not be parsed into a DataModel" in {
-      beforeEach()
       val request: FakeRequest[JsValue] = buildPost("/api").withBody[JsValue](Json.toJson(dataModel))
       val createdResult: Future[Result] = TestApplicationController.create()(request)
+      status(createdResult) shouldBe Status.CREATED
 
       val badUpdateRequest: FakeRequest[JsValue] = buildPost("/api/${dataModel._id}").withBody[JsValue](Json.toJson("abcd"))
       val badUpdateResult = TestApplicationController.update("abcd")(badUpdateRequest)
       status(badUpdateResult) shouldBe Status.BAD_REQUEST
       contentAsString(badUpdateResult) shouldBe "Invalid request body"
-      afterEach()
     }
 
-//    "add the book to the database if it could not be found" in { // upsert(true)
-//      beforeEach()
-//      val updateRequest: FakeRequest[JsValue] = buildPost("/api/${dataModel._id}").withBody[JsValue](Json.toJson(newDataModel))
-//      val updateResult = TestApplicationController.update("abcd")(updateRequest) // Future(<not completed>)
-//      status(updateResult) shouldBe Status.ACCEPTED
-//      contentAsJson(updateResult).as[DataModel] shouldBe newDataModel
-//      afterEach()
-//    }
-    "return a BadRequest if the user could not be found" in { // upsert(false)
-      beforeEach()
+    //    "add the book to the database if it could not be found" in { // upsert(true)
+    //      val updateRequest: FakeRequest[JsValue] = buildPost("/api/${dataModel._id}").withBody[JsValue](Json.toJson(newDataModel))
+    //      val updateResult = TestApplicationController.update("abcd")(updateRequest) // Future(<not completed>)
+    //      status(updateResult) shouldBe Status.ACCEPTED
+    //      contentAsJson(updateResult).as[DataModel] shouldBe newDataModel
+    //    }
+    "return a NotFound if the book could not be found" in { // upsert(false)
       val updateRequest: FakeRequest[JsValue] = buildPost("/api/${dataModel._id}").withBody[JsValue](Json.toJson(newDataModel))
       val updateResult = TestApplicationController.update("abcd")(updateRequest)
-      status(updateResult) shouldBe Status.BAD_REQUEST
+      status(updateResult) shouldBe Status.NOT_FOUND
       contentAsString(updateResult) shouldBe "Bad response from upstream; got status: 404, and got reason: Book not found"
 
       // check that database is still empty
       val indexResult: Future[Result] = TestApplicationController.index()(FakeRequest())
       status(indexResult) shouldBe Status.OK
       contentAsJson(indexResult).as[Seq[DataModel]] shouldBe Seq()
-      afterEach()
     }
   }
 
   "ApplicationController .updateWithValue()" should {
     "update a book's name in the database" in {
-      beforeEach()
       val request: FakeRequest[JsValue] = buildPost("/api").withBody[JsValue](Json.toJson(dataModel))
       val createdResult: Future[Result] = TestApplicationController.create()(request)
+      status(createdResult) shouldBe Status.CREATED
 
       val updateResult = TestApplicationController.updateWithValue("abcd", "name", "New Name")(FakeRequest())
       status(updateResult) shouldBe Status.ACCEPTED
       contentAsString(updateResult) shouldBe "name of book abcd has been updated to: New Name"
-      afterEach()
     }
 
     "update a book's page count in the database" in {
-      beforeEach()
       val request: FakeRequest[JsValue] = buildPost("/api").withBody[JsValue](Json.toJson(dataModel))
       val createdResult: Future[Result] = TestApplicationController.create()(request)
+      status(createdResult) shouldBe Status.CREATED
 
       val updateResult = TestApplicationController.updateWithValue("abcd", "pageCount", "200")(FakeRequest())
       status(updateResult) shouldBe Status.ACCEPTED
       contentAsString(updateResult) shouldBe "pageCount of book abcd has been updated to: 200"
-      afterEach()
     }
 
     "return a BadRequest if an invalid field is specified" in {
-      beforeEach()
       val request: FakeRequest[JsValue] = buildPost("/api").withBody[JsValue](Json.toJson(dataModel))
       val createdResult: Future[Result] = TestApplicationController.create()(request)
+      status(createdResult) shouldBe Status.CREATED
 
       val readResult: Future[Result] = TestApplicationController.updateWithValue("abcd", "bad", "qqq")(FakeRequest())
       status(readResult) shouldBe Status.BAD_REQUEST
-      contentAsString(readResult) shouldBe "Bad response from upstream; got status: 500, and got reason: Invalid field to update"
-      afterEach()
+      contentAsString(readResult) shouldBe "Bad response from upstream; got status: 400, and got reason: Invalid field to update"
     }
 
     "return a BadRequest if page count is updated with a non-integer value" in {
-      beforeEach()
       val request: FakeRequest[JsValue] = buildPost("/api").withBody[JsValue](Json.toJson(dataModel))
       val createdResult: Future[Result] = TestApplicationController.create()(request)
+      status(createdResult) shouldBe Status.CREATED
 
       val readResult: Future[Result] = TestApplicationController.updateWithValue("abcd", "pageCount", "1xx")(FakeRequest())
       status(readResult) shouldBe Status.BAD_REQUEST
-      contentAsString(readResult) shouldBe "Bad response from upstream; got status: 500, and got reason: Page count must be an integer"
-      afterEach()
+      contentAsString(readResult) shouldBe "Bad response from upstream; got status: 400, and got reason: Page count must be an integer"
     }
 
-    "return a BadRequest if the book does not exist in the database" in {
-      beforeEach()
+    "return a NotFound if the book does not exist in the database" in {
       val request: FakeRequest[JsValue] = buildPost("/api").withBody[JsValue](Json.toJson(dataModel))
       val createdResult: Future[Result] = TestApplicationController.create()(request)
+      status(createdResult) shouldBe Status.CREATED
 
       val readResult: Future[Result] = TestApplicationController.updateWithValue("aaaa", "pageCount", "100")(FakeRequest())
-      status(readResult) shouldBe Status.BAD_REQUEST
+      status(readResult) shouldBe Status.NOT_FOUND
       contentAsString(readResult) shouldBe "Bad response from upstream; got status: 404, and got reason: Book not found"
-      afterEach()
     }
   }
 
   "ApplicationController .delete()" should {
     "delete a book in the database" in {
-      beforeEach()
       val request: FakeRequest[JsValue] = buildPost("/api").withBody[JsValue](Json.toJson(dataModel))
       val createdResult: Future[Result] = TestApplicationController.create()(request)
+      status(createdResult) shouldBe Status.CREATED
 
       val deleteResult: Future[Result] = TestApplicationController.delete("abcd")(FakeRequest())
       status(deleteResult) shouldBe Status.ACCEPTED
@@ -301,30 +612,25 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
       val indexResult: Future[Result] = TestApplicationController.index()(FakeRequest())
       status(indexResult) shouldBe Status.OK
       contentAsJson(indexResult).as[Seq[DataModel]] shouldBe Seq()
-      afterEach()
     }
 
-//    "do nothing if the book could not be found" in {
-//      beforeEach()
-//      val request: FakeRequest[JsValue] = buildGet("/api/${dataModel._id}").withBody[JsValue](Json.toJson(dataModel))
-//      val createdResult: Future[Result] = TestApplicationController.create()(request)
-//
-//      val deleteResult: Future[Result] = TestApplicationController.delete("aaaa")(FakeRequest())
-//      status(deleteResult) shouldBe Status.ACCEPTED
-//
-//      // check that database still contains dataModel
-//      val indexResult: Future[Result] = TestApplicationController.index()(FakeRequest())
-//      status(indexResult) shouldBe Status.OK
-//      contentAsJson(indexResult).as[Seq[DataModel]] shouldBe Seq(dataModel)
-//      afterEach()
-//    }
+    //    "do nothing if the book could not be found" in {
+    //      val request: FakeRequest[JsValue] = buildGet("/api/${dataModel._id}").withBody[JsValue](Json.toJson(dataModel))
+    //      val createdResult: Future[Result] = TestApplicationController.create()(request)
+    //
+    //      val deleteResult: Future[Result] = TestApplicationController.delete("aaaa")(FakeRequest())
+    //      status(deleteResult) shouldBe Status.ACCEPTED
+    //
+    //      // check that database still contains dataModel
+    //      val indexResult: Future[Result] = TestApplicationController.index()(FakeRequest())
+    //      status(indexResult) shouldBe Status.OK
+    //      contentAsJson(indexResult).as[Seq[DataModel]] shouldBe Seq(dataModel)
+    //    }
 
-    "return a BadRequest if the book could not be found" in {
-      beforeEach()
+    "return a NotFound if the book could not be found" in {
       val deleteResult: Future[Result] = TestApplicationController.delete("aaaa")(FakeRequest())
-      status(deleteResult) shouldBe Status.BAD_REQUEST
+      status(deleteResult) shouldBe Status.NOT_FOUND
       contentAsString(deleteResult) shouldBe "Bad response from upstream; got status: 404, and got reason: Book not found"
-      afterEach()
     }
   }
 
@@ -365,374 +671,8 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
         .once()
 
       val extractionResult: Future[Result] = TestApplicationController.getGoogleBookList(search = "", term = "")(FakeRequest())
-      status(extractionResult) shouldBe BAD_REQUEST
+      status(extractionResult) shouldBe INTERNAL_SERVER_ERROR
       contentAsString(extractionResult) shouldBe "Bad response from upstream; got status: 500, and got reason: Could not connect"
-    }
-  }
-
-  ///// METHODS CALLED BY FRONTEND /////
-  "ApplicationController .listAllBooks()" should {
-    "list all books in the database" in {
-      beforeEach()
-      val request: FakeRequest[JsValue] = buildPost("/api").withBody[JsValue](Json.toJson(dataModel))
-      val createdResult: Future[Result] = TestApplicationController.create()(request)
-      val request2: FakeRequest[JsValue] = buildPost("/api").withBody[JsValue](Json.toJson(dataModel2))
-      val createdResult2: Future[Result] = TestApplicationController.create()(request2)
-
-      val listingResult: Future[Result] = TestApplicationController.listAllBooks()(FakeRequest())
-      status(listingResult) shouldBe Status.OK
-      contentAsString(listingResult) should include ("test description")
-      contentAsString(listingResult) should include ("The Decagon House Murders")
-      afterEach()
-    }
-
-    "show 'No books found' if the database is empty" in {
-      beforeEach()
-      val listingResult: Future[Result] = TestApplicationController.listAllBooks()(FakeRequest())
-      status(listingResult) shouldBe Status.OK
-      contentAsString(listingResult) should include ("No books found")
-      afterEach()
-    }
-  }
-
-  "ApplicationController .showBookDetails()" should {
-    "display the specified book's details" in {
-      beforeEach()
-      val request: FakeRequest[JsValue] = buildPost("/api").withBody[JsValue](Json.toJson(dataModel))
-      val createdResult: Future[Result] = TestApplicationController.create()(request)
-
-      val searchResult: Future[Result] = TestApplicationController.showBookDetails("abcd")(FakeRequest())
-      status(searchResult) shouldBe Status.OK
-      contentAsString(searchResult) should include ("test name")
-      afterEach()
-    }
-
-    "return a NotFound if the book is not in the database" in {
-      beforeEach()
-      val searchResult: Future[Result] = TestApplicationController.showBookDetails("abcd")(FakeRequest())
-      status(searchResult) shouldBe Status.NOT_FOUND
-      contentAsString(searchResult) should include ("Not found")
-      afterEach()
-    }
-  }
-
-  "ApplicationController .searchBookByID()" should {
-    "redirect to book details page when an ID is searched" in {
-      val searchRequest: FakeRequest[AnyContentAsFormUrlEncoded] = buildPost("/searchid").withFormUrlEncodedBody(
-        "bookID" -> "abcd"
-      )
-      val searchResult: Future[Result] = TestApplicationController.searchBookByID()(searchRequest)
-      status(searchResult) shouldBe Status.SEE_OTHER
-      redirectLocation(searchResult) shouldBe Some("/bookdetails/abcd")
-    }
-
-    "return a BadRequest if ID is blank" in {
-      val searchRequest: FakeRequest[AnyContentAsFormUrlEncoded] = buildPost("/searchid").withFormUrlEncodedBody(
-        "bookID" -> ""
-      )
-      val searchResult: Future[Result] = TestApplicationController.searchBookByID()(searchRequest)
-      status(searchResult) shouldBe Status.BAD_REQUEST
-      contentAsString(searchResult) should include ("No ID provided")
-    }
-  }
-
-  "ApplicationController .searchBookByTitle()" should {
-    "list the matching books" in {
-      beforeEach()
-      val request: FakeRequest[JsValue] = buildPost("/api").withBody[JsValue](Json.toJson(dataModel))
-      val createdResult: Future[Result] = TestApplicationController.create()(request)
-      val request2: FakeRequest[JsValue] = buildPost("/api").withBody[JsValue](Json.toJson(newDataModel))
-      val createdResult2: Future[Result] = TestApplicationController.create()(request2)
-
-      Thread.sleep(100)
-      val searchRequest: FakeRequest[AnyContentAsFormUrlEncoded] = buildPost("/searchtitle").withFormUrlEncodedBody(
-        "title" -> "test"
-      ) // .withCRSFToken not needed?
-      val searchResult: Future[Result] = TestApplicationController.searchBookByTitle()(searchRequest)
-      status(searchResult) shouldBe Status.OK
-      contentAsString(searchResult) should include ("test name")
-      contentAsString(searchResult) shouldNot include ("new name")
-      afterEach()
-    }
-
-    "show 'No books found' if the database is empty" in {
-      beforeEach()
-      val searchRequest: FakeRequest[AnyContentAsFormUrlEncoded] = buildPost("/searchtitle").withFormUrlEncodedBody(
-        "title" -> " name"
-      ) // .withCRSFToken not needed?
-      val searchResult: Future[Result] = TestApplicationController.searchBookByTitle()(searchRequest)
-      status(searchResult) shouldBe Status.OK
-      contentAsString(searchResult) should include ("No books found")
-      afterEach()
-    }
-
-    "return a BadRequest if title is blank" in {
-      val searchRequest: FakeRequest[AnyContentAsFormUrlEncoded] = buildPost("/searchid").withFormUrlEncodedBody(
-        "title" -> ""
-      )
-      val searchResult: Future[Result] = TestApplicationController.searchBookByTitle()(searchRequest)
-      status(searchResult) shouldBe Status.BAD_REQUEST
-      contentAsString(searchResult) should include ("No title provided")
-    }
-  }
-
-  "ApplicationController .searchGoogleAndDisplay()" should {
-    "list the API search results without adding books to the database" in {
-      beforeEach()
-      val reqBody = Some(Map(
-        "search" -> List("something"),
-        "keyword" -> List("inauthor"),
-        "term_value" -> List("something")
-      ))
-
-      (mockLibraryService.getGoogleCollection(_: Option[Map[String, Seq[String]]])(_: ExecutionContext))
-        .expects(reqBody, *)
-        .returning(EitherT.rightT(LibraryServiceSpec.testAPICollection))
-        .once()
-
-      (mockLibraryService.extractBooksFromCollection(_: Collection))
-        .expects(LibraryServiceSpec.testAPICollection)
-        .returning(Seq(dataModel, dataModel2))
-        .once()
-
-      val searchRequest: FakeRequest[AnyContentAsFormUrlEncoded] = buildPost("/searchgoogle").withFormUrlEncodedBody(
-        "search" -> "something",
-        "keyword" -> "inauthor",
-        "term_value" -> "something"
-      ) // .withCRSFToken not needed?
-      val searchResult: Future[Result] = TestApplicationController.searchGoogleAndDisplay()(searchRequest)
-      status(searchResult) shouldBe Status.OK
-      contentAsString(searchResult) should include ("test description")
-      contentAsString(searchResult) should include ("The Decagon House Murders")
-      contentAsString(searchResult) should include ("Add to database")
-
-      val indexResult: Future[Result] = TestApplicationController.index()(FakeRequest())
-      status(indexResult) shouldBe Status.OK
-      contentAsJson(indexResult).as[Seq[DataModel]] shouldBe Seq() // database should be empty
-      afterEach()
-    }
-
-    "list the API search results and add the books to the database" in {
-      beforeEach()
-      val reqBody = Some(Map(
-        "search" -> List("something"),
-        "keyword" -> List("inauthor"),
-        "term_value" -> List("something"),
-        "add_to_database" -> List("true")
-      ))
-
-      (mockLibraryService.getGoogleCollection(_: Option[Map[String, Seq[String]]])(_: ExecutionContext))
-        .expects(reqBody, *)
-        .returning(EitherT.rightT(LibraryServiceSpec.testAPICollection))
-        .once()
-
-      (mockLibraryService.extractBooksFromCollection(_: Collection))
-        .expects(LibraryServiceSpec.testAPICollection)
-        .returning(Seq(dataModel, dataModel2))
-        .once()
-
-      val searchRequest: FakeRequest[AnyContentAsFormUrlEncoded] = buildPost("/searchgoogle").withFormUrlEncodedBody(
-        "search" -> "something",
-        "keyword" -> "inauthor",
-        "term_value" -> "something",
-        "add_to_database" -> "true"
-      ) // .withCRSFToken not needed?
-      val searchResult: Future[Result] = TestApplicationController.searchGoogleAndDisplay()(searchRequest)
-      status(searchResult) shouldBe Status.OK
-      contentAsString(searchResult) should include ("test description")
-      contentAsString(searchResult) should include ("The Decagon House Murders")
-      contentAsString(searchResult) shouldNot include ("Add to database")
-
-      Thread.sleep(100) // allow time to add books to database
-      val indexResult: Future[Result] = TestApplicationController.index()(FakeRequest())
-      status(indexResult) shouldBe Status.OK
-      contentAsJson(indexResult).as[Seq[DataModel]] should contain theSameElementsAs Seq(dataModel, dataModel2) // database should contain the 2 books
-      afterEach()
-    }
-
-    "show 'No books found' if there are no search results" in {
-      beforeEach()
-      val reqBody = Some(Map(
-        "search" -> List("something"),
-        "keyword" -> List("inauthor"),
-        "term_value" -> List("something")
-      ))
-
-      (mockLibraryService.getGoogleCollection(_: Option[Map[String, Seq[String]]])(_: ExecutionContext))
-        .expects(reqBody, *)
-        .returning(EitherT.rightT(LibraryServiceSpec.testAPICollection))
-        .once()
-
-      (mockLibraryService.extractBooksFromCollection(_: Collection))
-        .expects(*)
-        .returning(Seq())
-        .once()
-
-      val searchRequest: FakeRequest[AnyContentAsFormUrlEncoded] = buildPost("/searchgoogle").withFormUrlEncodedBody(
-        "search" -> "something",
-        "keyword" -> "inauthor",
-        "term_value" -> "something"
-      ) // .withCRSFToken not needed?
-      val searchResult: Future[Result] = TestApplicationController.searchGoogleAndDisplay()(searchRequest)
-      status(searchResult) shouldBe Status.OK
-      contentAsString(searchResult) should include ("No books found")
-      afterEach()
-    }
-
-    "return a BadRequest if keyword is blank" in {
-      val reqBody = Some(Map(
-        "search" -> List("something"),
-        "keyword" -> List(""),
-        "term_value" -> List("something")
-      ))
-
-      (mockLibraryService.getGoogleCollection(_: Option[Map[String, Seq[String]]])(_: ExecutionContext))
-        .expects(reqBody, *)
-        .returning(EitherT.leftT(APIError.BadAPIResponse(400, "Keyword missing from search")))
-        .once()
-
-      val searchRequest: FakeRequest[AnyContentAsFormUrlEncoded] = buildPost("/searchgoogle").withFormUrlEncodedBody(
-        "search" -> "something",
-        "keyword" -> "",
-        "term_value" -> "something"
-      ) // .withCRSFToken not needed?
-      val searchResult: Future[Result] = TestApplicationController.searchGoogleAndDisplay()(searchRequest)
-      status(searchResult) shouldBe Status.BAD_REQUEST
-      contentAsString(searchResult) should include ("Keyword missing from search")
-    }
-  }
-
-  "ApplicationController .addFromSearch()" should {
-    "add a book to the database" in {
-      beforeEach()
-      val addBookRequest: FakeRequest[AnyContentAsFormUrlEncoded] = buildPost("/addfromsearch").withFormUrlEncodedBody(
-        "_id" -> "abcd",
-        "name" -> "test name",
-        "description" -> "test description",
-        "pageCount" -> "100"
-      ) // .withCRSFToken not needed?
-      val addBookResult: Future[Result] = TestApplicationController.addFromSearch()(addBookRequest)
-      status(addBookResult) shouldBe Status.OK
-      contentAsString(addBookResult) should include ("test name")
-      afterEach()
-    }
-
-    "return a BadRequest if the book ID is already in the database" in {
-      beforeEach()
-      val request: FakeRequest[JsValue] = buildPost("/api").withBody[JsValue](Json.toJson(dataModel))
-      val createdResult: Future[Result] = TestApplicationController.create()(request)
-
-      val addBookRequest: FakeRequest[AnyContentAsFormUrlEncoded] = buildPost("/addfromsearch").withFormUrlEncodedBody(
-        "_id" -> "abcd",
-        "name" -> "test name",
-        "description" -> "test description",
-        "pageCount" -> "100"
-      ) // .withCRSFToken not needed?
-      val addBookResult: Future[Result] = TestApplicationController.addFromSearch()(addBookRequest)
-      status(addBookResult) shouldBe Status.BAD_REQUEST
-      contentAsString(addBookResult) should include ("Book ID already exists in database")
-      afterEach()
-    }
-  }
-
-  "ApplicationController .addBookForm()" should {
-    "add a book to the database" in {
-      beforeEach()
-      val addBookRequest: FakeRequest[AnyContentAsFormUrlEncoded] = buildPost("/add/form").withFormUrlEncodedBody(
-        "_id" -> "abcd",
-        "name" -> "test name",
-        "description" -> "test description",
-        "pageCount" -> "100"
-      ) // .withCRSFToken not needed?
-      val addBookResult: Future[Result] = TestApplicationController.addBookForm()(addBookRequest)
-      status(addBookResult) shouldBe Status.OK
-      // println(contentAsString(addBookResult))
-      afterEach()
-    }
-
-    "detect a form with errors" in {
-      beforeEach()
-      val addBookRequest: FakeRequest[AnyContentAsFormUrlEncoded] = buildPost("/add/form").withFormUrlEncodedBody(
-        "_id" -> "abcd",
-        "name" -> "",
-        "description" -> "test description",
-        "pageCount" -> "100"
-      ) // .withCRSFToken not needed?
-      val addBookResult: Future[Result] = TestApplicationController.addBookForm()(addBookRequest)
-      status(addBookResult) shouldBe Status.BAD_REQUEST
-      afterEach()
-    }
-
-    "return a BadRequest if the book ID is already in the database" in {
-      beforeEach()
-      val request: FakeRequest[JsValue] = buildPost("/api").withBody[JsValue](Json.toJson(dataModel))
-      val createdResult: Future[Result] = TestApplicationController.create()(request)
-
-      val addBookRequest: FakeRequest[AnyContentAsFormUrlEncoded] = buildPost("/add/form").withFormUrlEncodedBody(
-        "_id" -> "abcd",
-        "name" -> "test name",
-        "description" -> "test description",
-        "pageCount" -> "100"
-      ) // .withCRSFToken not needed?
-      val addBookResult: Future[Result] = TestApplicationController.addBookForm()(addBookRequest)
-      status(addBookResult) shouldBe Status.BAD_REQUEST
-      contentAsString(addBookResult) should include ("Book ID already exists in database")
-      afterEach()
-    }
-  }
-
-  "ApplicationController .updateBookForm()" should {
-    "update a book in the database" in {
-      beforeEach()
-      val request: FakeRequest[JsValue] = buildPost("/api").withBody[JsValue](Json.toJson(dataModel))
-      val createdResult: Future[Result] = TestApplicationController.create()(request)
-
-      val updateBookRequest: FakeRequest[AnyContentAsFormUrlEncoded] = buildPost("/update/form").withFormUrlEncodedBody(
-        "_id" -> "abcd",
-        "name" -> "new name",
-        "description" -> "new description",
-        "pageCount" -> "200"
-      ) // .withCRSFToken not needed?
-      val updateBookResult: Future[Result] = TestApplicationController.updateBookForm()(updateBookRequest)
-      status(updateBookResult) shouldBe Status.OK
-      contentAsString(updateBookResult) should include ("new name")
-      afterEach()
-    }
-
-    "detect a form with errors" in {
-      beforeEach()
-      val request: FakeRequest[JsValue] = buildPost("/api").withBody[JsValue](Json.toJson(dataModel))
-      val createdResult: Future[Result] = TestApplicationController.create()(request)
-
-      val updateBookRequest: FakeRequest[AnyContentAsFormUrlEncoded] = buildPost("/add/form").withFormUrlEncodedBody(
-        "_id" -> "abcd",
-        "name" -> "new name",
-        "description" -> "new description",
-        "pageCount" -> "aaa"
-      ) // .withCRSFToken not needed?
-      val updateBookResult: Future[Result] = TestApplicationController.updateBookForm()(updateBookRequest)
-      status(updateBookResult) shouldBe Status.BAD_REQUEST
-      afterEach()
-    }
-  }
-
-  "ApplicationController .deleteBook()" should {
-    "delete a book from the database" in {
-      beforeEach()
-      val request: FakeRequest[JsValue] = buildPost("/api").withBody[JsValue](Json.toJson(dataModel))
-      val createdResult: Future[Result] = TestApplicationController.create()(request)
-
-      val deleteResult: Future[Result] = TestApplicationController.deleteBook("abcd")(FakeRequest())
-      status(deleteResult) shouldBe Status.OK
-      contentAsString(deleteResult) should include ("Delete successful!")
-    }
-
-    "return a BadRequest if the book could not be found" in {
-      beforeEach()
-      val deleteResult: Future[Result] = TestApplicationController.deleteBook("aaaa")(FakeRequest())
-      status(deleteResult) shouldBe Status.BAD_REQUEST
-      contentAsString(deleteResult) should include ("Book not found in database")
-      afterEach()
     }
   }
 
