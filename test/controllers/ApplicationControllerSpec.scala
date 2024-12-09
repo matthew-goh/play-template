@@ -43,6 +43,8 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
     "test description 2",
     289
   )
+  
+  // Note: .withCRSFToken is included in buildGet/buildPost in BaseSpec, so not needed again here when testing form submission
 
   ///// METHODS CALLED BY FRONTEND /////
   "ApplicationController .listAllBooks()" should {
@@ -120,7 +122,7 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
 
       val searchRequest: FakeRequest[AnyContentAsFormUrlEncoded] = buildPost("/searchtitle").withFormUrlEncodedBody(
         "title" -> "test"
-      ) // .withCRSFToken not needed?
+      )
       val searchResult: Future[Result] = TestApplicationController.searchBookByTitle()(searchRequest)
       status(searchResult) shouldBe Status.OK
       contentAsString(searchResult) should include ("test name")
@@ -130,7 +132,7 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
     "show 'No books found' if the database is empty" in {
       val searchRequest: FakeRequest[AnyContentAsFormUrlEncoded] = buildPost("/searchtitle").withFormUrlEncodedBody(
         "title" -> " name"
-      ) // .withCRSFToken not needed?
+      ) 
       val searchResult: Future[Result] = TestApplicationController.searchBookByTitle()(searchRequest)
       status(searchResult) shouldBe Status.OK
       contentAsString(searchResult) should include ("No books found")
@@ -168,7 +170,7 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
         "search" -> "something",
         "keyword" -> "inauthor",
         "term_value" -> "something"
-      ) // .withCRSFToken not needed?
+      ) 
       val searchResult: Future[Result] = TestApplicationController.searchGoogleAndDisplay()(searchRequest)
       status(searchResult) shouldBe Status.OK
       contentAsString(searchResult) should include ("test description")
@@ -203,7 +205,7 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
         "keyword" -> "inauthor",
         "term_value" -> "something",
         "add_to_database" -> "true"
-      ) // .withCRSFToken not needed?
+      ) 
       val searchResult: Future[Result] = TestApplicationController.searchGoogleAndDisplay()(searchRequest)
       // allow time to add books to database
       whenReady(searchResult) { _ =>
@@ -238,7 +240,7 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
         "search" -> "something",
         "keyword" -> "inauthor",
         "term_value" -> "something"
-      ) // .withCRSFToken not needed?
+      ) 
       val searchResult: Future[Result] = TestApplicationController.searchGoogleAndDisplay()(searchRequest)
       status(searchResult) shouldBe Status.OK
       contentAsString(searchResult) should include ("No books found")
@@ -260,7 +262,7 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
         "search" -> "something",
         "keyword" -> "",
         "term_value" -> "something"
-      ) // .withCRSFToken not needed?
+      ) 
       val searchResult: Future[Result] = TestApplicationController.searchGoogleAndDisplay()(searchRequest)
       status(searchResult) shouldBe Status.BAD_REQUEST
       contentAsString(searchResult) should include ("Keyword missing from search")
@@ -274,7 +276,7 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
         "name" -> "test name",
         "description" -> "test description",
         "pageCount" -> "100"
-      ) // .withCRSFToken not needed?
+      ) 
       val addBookResult: Future[Result] = TestApplicationController.addFromSearch()(addBookRequest)
       status(addBookResult) shouldBe Status.OK
       contentAsString(addBookResult) should include ("test name")
@@ -289,7 +291,7 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
         "name" -> "test name",
         "description" -> "test description",
         "pageCount" -> "100"
-      ) // .withCRSFToken not needed?
+      ) 
       val addBookResult: Future[Result] = TestApplicationController.addFromSearch()(addBookRequest)
       status(addBookResult) shouldBe Status.INTERNAL_SERVER_ERROR
       contentAsString(addBookResult) should include ("Book already exists in database")
@@ -303,7 +305,7 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
         "name" -> "test name",
         "description" -> "test description",
         "pageCount" -> "100"
-      ) // .withCRSFToken not needed?
+      ) 
       val addBookResult: Future[Result] = TestApplicationController.addBookForm()(addBookRequest)
       status(addBookResult) shouldBe Status.OK
       // println(contentAsString(addBookResult))
@@ -314,10 +316,13 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
         "_id" -> "abcd",
         "name" -> "",
         "description" -> "test description",
-        "pageCount" -> "100"
-      ) // .withCRSFToken not needed?
+        "pageCount" -> "2500"
+      ) 
       val addBookResult: Future[Result] = TestApplicationController.addBookForm()(addBookRequest)
       status(addBookResult) shouldBe Status.BAD_REQUEST
+      contentAsString(addBookResult) should include ("abcd")
+      contentAsString(addBookResult) should include ("This field is required")
+      contentAsString(addBookResult) should include ("Must be less or equal to 2,000")
     }
 
     "return an InternalServerError if the book ID is already in the database" in {
@@ -330,7 +335,7 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
         "name" -> "test name",
         "description" -> "test description",
         "pageCount" -> "100"
-      ) // .withCRSFToken not needed?
+      ) 
       val addBookResult: Future[Result] = TestApplicationController.addBookForm()(addBookRequest)
       status(addBookResult) shouldBe Status.INTERNAL_SERVER_ERROR
       contentAsString(addBookResult) should include ("Book already exists in database")
@@ -348,7 +353,7 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
         "name" -> "new name",
         "description" -> "new description",
         "pageCount" -> "200"
-      ) // .withCRSFToken not needed?
+      ) 
       val updateBookResult: Future[Result] = TestApplicationController.updateBookForm()(updateBookRequest)
       status(updateBookResult) shouldBe Status.OK
       contentAsString(updateBookResult) should include ("new name")
@@ -364,9 +369,11 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
         "name" -> "new name",
         "description" -> "new description",
         "pageCount" -> "aaa"
-      ) // .withCRSFToken not needed?
+      ) 
       val updateBookResult: Future[Result] = TestApplicationController.updateBookForm()(updateBookRequest)
       status(updateBookResult) shouldBe Status.BAD_REQUEST
+      contentAsString(updateBookResult) should include ("new name")
+      contentAsString(updateBookResult) should include ("Numeric value expected")
     }
   }
 
