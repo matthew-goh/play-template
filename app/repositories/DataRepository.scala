@@ -30,7 +30,7 @@ class DataRepository @Inject()(mongoComponent: MongoComponent)
 ) with DataRepositoryTrait {
 
   // list all DataModels in the database (one DataModel is one book)
-  def index(): Future[Either[APIError.BadAPIResponse, Seq[DataModel]]]  = {
+  def index(): Future[Either[APIError, Seq[DataModel]]]  = {
     collection.find().toFuture().map{ books: Seq[DataModel] => Right(books) }
       .recover{
         case e: Exception => Left(APIError.BadAPIResponse(500, s"Unable to find database collection: ${e.getMessage}"))
@@ -38,7 +38,7 @@ class DataRepository @Inject()(mongoComponent: MongoComponent)
   }
 
   // add a DataModel object to database
-  def create(book: DataModel): Future[Either[APIError.BadAPIResponse, DataModel]] = {
+  def create(book: DataModel): Future[Either[APIError, DataModel]] = {
     collection.insertOne(book).toFuture().map { insertResult =>
       if (insertResult.wasAcknowledged) {
         Right(book)
@@ -163,8 +163,8 @@ class DataRepository @Inject()(mongoComponent: MongoComponent)
 
 @ImplementedBy(classOf[DataRepository])
 trait DataRepositoryTrait {
-  def index(): Future[Either[APIError.BadAPIResponse, Seq[DataModel]]]
-  def create(book: DataModel): Future[Either[APIError.BadAPIResponse, DataModel]]
+  def index(): Future[Either[APIError, Seq[DataModel]]]
+  def create(book: DataModel): Future[Either[APIError, DataModel]]
   def read(id: String): Future[Either[APIError, DataModel]]
   def readBySpecifiedField(field: DataModelFields.Value, value: String): Future[Either[APIError, Seq[DataModel]]]
   def update(id: String, book: DataModel): Future[Either[APIError, result.UpdateResult]]

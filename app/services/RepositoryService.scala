@@ -13,15 +13,15 @@ import scala.util.{Failure, Success, Try}
 class RepositoryService @Inject()(repositoryTrait: DataRepositoryTrait)
                                  (implicit ec: ExecutionContext){
 
-  def index(): Future[Either[APIError.BadAPIResponse, Seq[DataModel]]] = {
+  def index(): Future[Either[APIError, Seq[DataModel]]] = {
     repositoryTrait.index()
   }
 
-  def create(book: DataModel): Future[Either[APIError.BadAPIResponse, DataModel]] = {
+  def create(book: DataModel): Future[Either[APIError, DataModel]] = {
     repositoryTrait.create(book)
   }
   // version called by ApplicationController addFromSearch()
-  def create(reqBody: Option[Map[String, Seq[String]]]): Future[Either[APIError.BadAPIResponse, DataModel]] = {
+  def create(reqBody: Option[Map[String, Seq[String]]]): Future[Either[APIError, DataModel]] = {
 //    val id: String = reqBody.flatMap(_.get("_id").flatMap(_.headOption)).getOrElse("")
 //    val name: String = reqBody.flatMap(_.get("name").flatMap(_.headOption)).getOrElse("")
 //    val description: String = reqBody.flatMap(_.get("description").flatMap(_.headOption)).getOrElse("")
