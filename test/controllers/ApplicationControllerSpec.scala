@@ -645,7 +645,7 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
     "return a Collection" in {
       (mockLibraryService.getGoogleCollection(_: Option[String], _: String, _: String)(_: ExecutionContext))
         .expects(None, *, *, *)
-        .returning(EitherT.rightT(LibraryServiceSpec.testAPIResult.as[Collection]))
+        .returning(EitherT.rightT(LibraryServiceSpec.testAPICollection))
         .once()
 
       val collectionResult: Future[Result] = TestApplicationController.getGoogleCollection(search = "", term = "")(FakeRequest())
@@ -658,7 +658,7 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
     "return a list of DataModels" in {
       (mockLibraryService.getGoogleCollection(_: Option[String], _: String, _: String)(_: ExecutionContext))
         .expects(None, *, *, *)
-        .returning(EitherT.rightT(LibraryServiceSpec.testAPIResult.as[Collection]))
+        .returning(EitherT.rightT(LibraryServiceSpec.testAPICollection))
         .once()
 
       (mockLibraryService.extractBooksFromCollection(_: Collection))

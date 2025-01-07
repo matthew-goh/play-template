@@ -31,7 +31,7 @@ class LibraryServiceSpec extends BaseSpec with MockFactory with ScalaFutures wit
     "return a Collection" in {
       (mockConnector.get[Collection](_: String)(_: OFormat[Collection], _: ExecutionContext))
         .expects(url, *, *) // can take *, which shows that the connector can expect any request in place of the parameter. You might sometimes see this as any().
-        .returning(EitherT.rightT(LibraryServiceSpec.testAPIResult.as[Collection])) // explicitly states what the connector method returns
+        .returning(EitherT.rightT(Json.parse(LibraryServiceSpec.testAPIResultStr).as[Collection])) // explicitly states what the connector method returns
         .once() // how many times we can expect this response
 
       // allows for the result to be waited for as the Future type can be seen as a placeholder for a value we don't have yet
@@ -63,7 +63,7 @@ class LibraryServiceSpec extends BaseSpec with MockFactory with ScalaFutures wit
 
       (mockConnector.get[Collection](_: String)(_: OFormat[Collection], _: ExecutionContext))
         .expects(url, *, *)
-        .returning(EitherT.rightT(LibraryServiceSpec.testAPIResult.as[Collection]))
+        .returning(EitherT.rightT(Json.parse(LibraryServiceSpec.testAPIResultStr).as[Collection]))
         .once()
 
       whenReady(testService.getGoogleCollection(reqBody = reqBody).value) { result =>
@@ -119,7 +119,7 @@ class LibraryServiceSpec extends BaseSpec with MockFactory with ScalaFutures wit
 }
 
 object LibraryServiceSpec {
-  val testAPIResult: JsValue = Json.parse("""{
+  val testAPIResultStr: String = """{
     "kind": "books#volumes",
     "totalItems": 1,
     "items": [
@@ -197,7 +197,7 @@ object LibraryServiceSpec {
         }
       }
     ]
-  }""")
+  }"""
 
   val testAPIVolumeInfo: VolumeInfo = VolumeInfo("The Decagon House Murders", Some("\"Ayatsuji's brilliant and richly atmospheric puzzle will appeal to fans of golden age whodunits...\""), 289)
   val testAPIVolumeInfoNoDesc: VolumeInfo = VolumeInfo("The Decagon House Murders", None, 289)

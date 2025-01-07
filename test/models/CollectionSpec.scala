@@ -7,7 +7,7 @@ import services.LibraryServiceSpec
 class CollectionSpec extends BaseSpec {
   "casting an API result to a Collection" should {
     "cast the value of 'items' into a list of books, which in turn each contain a VolumeInfo" in {
-      LibraryServiceSpec.testAPIResult.as[Collection] shouldBe
+      Json.parse(LibraryServiceSpec.testAPIResultStr).as[Collection] shouldBe
         Collection("books#volumes", 1, Some(Seq(Book("1GIrEAAAQBAJ", LibraryServiceSpec.testAPIVolumeInfo))))
     }
 
