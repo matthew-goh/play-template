@@ -1,5 +1,6 @@
 package controllers
 
+import eu.timepit.refined.auto._
 import models.DataModel
 import play.api.libs.json._
 import play.api.mvc._

@@ -2,6 +2,7 @@ package controllers
 
 import baseSpec.BaseSpecWithApplication
 import cats.data.EitherT
+import eu.timepit.refined.auto._
 import models.{APIError, Collection, DataModel}
 import org.scalamock.scalatest.MockFactory
 import org.scalatestplus.play.guice.GuiceOneAppPerSuite
@@ -316,13 +317,13 @@ class ApplicationControllerSpec extends BaseSpecWithApplication with MockFactory
         "_id" -> "abcd",
         "name" -> "",
         "description" -> "test description",
-        "pageCount" -> "2500"
+        "pageCount" -> "2800"
       ) 
       val addBookResult: Future[Result] = TestApplicationController.addBookForm()(addBookRequest)
       status(addBookResult) shouldBe Status.BAD_REQUEST
       contentAsString(addBookResult) should include ("abcd")
       contentAsString(addBookResult) should include ("This field is required")
-      contentAsString(addBookResult) should include ("Must be less or equal to 2,000")
+      contentAsString(addBookResult) should include ("Must be less or equal to 2500")
     }
 
     "return an InternalServerError if the book ID is already in the database" in {

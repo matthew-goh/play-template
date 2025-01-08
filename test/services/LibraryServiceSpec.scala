@@ -3,6 +3,7 @@ package services
 import baseSpec.BaseSpec
 import cats.data.EitherT
 import connectors.LibraryConnector
+import eu.timepit.refined.auto._
 import models.{APIError, Book, Collection, DataModel, VolumeInfo}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.ScalaFutures

@@ -1,6 +1,7 @@
 package services
 
-import cats.data.EitherT
+import eu.timepit.refined.api._
+import models.RefinedTypes.{NonEmptyString, PageCount}
 import models.{APIError, DataModel}
 import org.mongodb.scala.result
 import repositories.{DataModelFields, DataRepositoryTrait}
@@ -32,13 +33,16 @@ class RepositoryService @Inject()(repositoryTrait: DataRepositoryTrait)
 
     // description can be blank
     val description: String = reqBody.flatMap(_.get("description").flatMap(_.headOption)).getOrElse("")
-    val reqBodyValuesEither: Either[APIError.BadAPIResponse, DataModel] = for {
+    val reqBodyValuesEither: Either[APIError, DataModel] = for {
       // if any required value is missing, the result is Left(missingError)
-      id <- reqBody.flatMap(_.get("_id").flatMap(_.headOption)).toRight(missingError)
-      name <- reqBody.flatMap(_.get("name").flatMap(_.headOption)).toRight(missingError)
+      id <- RefType.applyRef[NonEmptyString](reqBody.flatMap(_.get("_id").flatMap(_.headOption)).getOrElse(""))
+        .left.map(_ => missingError)
+      name <- RefType.applyRef[NonEmptyString](reqBody.flatMap(_.get("name").flatMap(_.headOption)).getOrElse(""))
+        .left.map(_ => missingError)
       pageCountStr <- reqBody.flatMap(_.get("pageCount").flatMap(_.headOption)).toRight(missingError)
       // if any data type is invalid, the result is Left(invalidTypeError)
-      pageCount <- Try(pageCountStr.toInt).toOption.toRight(invalidTypeError)
+      pageCountInt <- Try(pageCountStr.toInt).toOption.toRight(invalidTypeError)
+      pageCount <- RefType.applyRef[PageCount](pageCountInt).left.map(_ => invalidTypeError)
     } yield DataModel(id, name, description, pageCount)
 
     reqBodyValuesEither match {

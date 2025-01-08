@@ -3,6 +3,7 @@ package connectors
 import baseSpec.BaseSpecWithApplication
 import com.github.tomakehurst.wiremock.WireMockServer
 import com.github.tomakehurst.wiremock.client.WireMock._
+import eu.timepit.refined.auto._
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration
 import models.{APIError, Book, Collection}
 import org.scalatest.BeforeAndAfterAll

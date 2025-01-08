@@ -1,6 +1,7 @@
 package models
 
 import baseSpec.BaseSpec
+import eu.timepit.refined.auto._
 import play.api.libs.json.{JsValue, Json}
 import services.LibraryServiceSpec
 

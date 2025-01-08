@@ -1,6 +1,7 @@
 package models
 
 import baseSpec.BaseSpec
+import eu.timepit.refined.auto._
 import play.api.data._
 import play.api.data.Forms._
 
@@ -9,7 +10,7 @@ import scala.collection.immutable.ArraySeq
 class DataModelSpec extends BaseSpec {
   val addBookForm: Form[DataModel] = DataModel.dataForm
   lazy val formData: DataModel = DataModel("abcd", "Test Title", "test description", 100)
-  lazy val formDataInvalid: DataModel = DataModel("", "", "", -1)
+//  lazy val formDataInvalid: DataModel = DataModel("", "", "", -1) // does not compile with refined types
 
   "Add book form" should {
     "bind" when {
@@ -36,7 +37,7 @@ class DataModelSpec extends BaseSpec {
         completedForm.value shouldBe None
         completedForm.errors shouldBe List(FormError("_id", List("error.required"), List()),
           FormError("name", List("error.required"), List()),
-          FormError("pageCount", List("error.min"), ArraySeq(0)))
+          FormError("pageCount", List("error.min"), List("0")))
       }
 
       "with a invalid response (non-integer page count)" in {
@@ -70,15 +71,15 @@ class DataModelSpec extends BaseSpec {
           "pageCount" -> "100")
       }
 
-      "with an invalid response (unsubmitted)" in {
-        val filledForm = addBookForm.fill(formDataInvalid)
-        filledForm.value shouldBe Some(formDataInvalid)
-        filledForm.errors shouldBe List.empty
-        filledForm.data shouldBe Map("_id" -> "",
-          "name" -> "",
-          "description" -> "",
-          "pageCount" -> "-1")
-      }
+//      "with an invalid response (unsubmitted)" in {
+//        val filledForm = addBookForm.fill(formDataInvalid)
+//        filledForm.value shouldBe Some(formDataInvalid)
+//        filledForm.errors shouldBe List.empty
+//        filledForm.data shouldBe Map("_id" -> "",
+//          "name" -> "",
+//          "description" -> "",
+//          "pageCount" -> "-1")
+//      }
     }
   }
 }

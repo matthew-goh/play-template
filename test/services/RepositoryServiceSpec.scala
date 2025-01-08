@@ -2,6 +2,7 @@ package services
 
 import baseSpec.BaseSpec
 import com.mongodb.client.result._
+import eu.timepit.refined.auto._
 import models.{APIError, DataModel}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.ScalaFutures

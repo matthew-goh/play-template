@@ -35,7 +35,7 @@ class LibraryService @Inject()(connector: LibraryConnector) {
 
   def extractBooksFromCollection(collection: Collection): Seq[DataModel] = {
     collection.items match {
-      case Some(bookList) => bookList.map { book => convertBookToDataModel(book) }
+      case Some(bookList) => bookList.map(convertBookToDataModel)
       case None => Seq()
     }
   }
